@@ -60,8 +60,9 @@ Verification
 ``make test-wasm`` runs the actual WASM binary using the exact browser import
 adapter under Node. ``make test-browser`` additionally launches Chromium against
 the HTML UI. The optional browser test needs a Chromium executable and a sandbox
-that permits its local sockets. The test's file-access flag is for isolated local
-testing only, not required when normally serving over HTTP.
+that permits its local sockets. The test starts a local HTTP server and uses Chrome DevTools Protocol to wait
+for actual BASIC output; it does not depend on file-access exceptions or a
+virtual-clock deadline.
 
 The default PIE loads at 4 MB. Use ``?base=0xc00000`` to select a 12 MB load bias
 or ``?elf=exec`` for the fixed-address ELF. Program images remain identical across

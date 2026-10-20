@@ -41,3 +41,4 @@ jobs:
           path: |
             build/docs/html/
             docs/_generated/
+            build/browser.png
