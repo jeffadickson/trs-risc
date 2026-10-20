@@ -104,3 +104,61 @@ The RV64 browser guest targets keep an unstripped ``.full`` file in build/ and
 remove DWARF payload from the served ELF while preserving symbols. This keeps
 compiler-dependent debug size out of the emulator upload budget. The fixed-size
 Z80 ROM and all loadable BASIC code/data remain present.
+
+Windows with WSL2
+-----------------
+
+Use an x86-64 Linux distribution in WSL2 (Ubuntu 24.04 was used for local
+validation). Run the Make commands inside Linux, not Windows PowerShell. Clone
+with LF line endings so shell scripts remain executable by a POSIX shell:
+
+.. code-block:: sh
+
+   git -c core.autocrlf=false clone https://github.com/jeffadickson/trs-risc.git
+   cd trs-risc
+   git config core.autocrlf false
+   make bootstrap
+   make bootstrap-riscv
+   make test
+   make test-riscv
+   make test-wasm
+   make test-riscv-wasm
+   make docs
+   CHROMIUM=/path/to/linux/chrome make test-browser
+   make serve
+
+Open http://localhost:8080/ in the Windows browser. WSL localhost forwarding
+must be enabled. The default runs the RV64 PIE through the WASM CPU; use
+``?base=0xc00000`` for 12 MB, ``?elf=exec`` for fixed-address ELF, and
+``?engine=direct`` for the separate direct WASM comparison.
+
+The prerequisites above still apply inside WSL. Install Node 22 and Linux
+Chromium (or Chrome for Testing) for the Node and browser checks; a Windows
+browser executable is not a replacement for the Linux browser used by the
+current test harness. Set ``CHROMIUM`` to its Linux executable path. No npm
+packages are required. Browser shared libraries must also be available.
+
+An existing ``dotnet`` command does not guarantee that the required .NET 8 SDK
+and runtime are installed. Check ``dotnet --list-sdks`` and
+``dotnet --list-runtimes``; .NET 10 alone was insufficient. The current bootstrap
+checks command presence, so provide .NET 8 explicitly in this case. A Linux SDK
+installed in ``.toolchain/dotnet`` is automatically selected by Make. If using
+checkout-local Node, add ``.toolchain/node/bin`` to PATH before tests.
+
+Extracting SDKs, Python packages and Zig's many small files on a Windows-mounted
+``/mnt/c`` checkout can be slow. A checkout on the WSL Linux filesystem avoids
+that overhead. Generated files and local toolchains remain ignored either way;
+do not run ``git clean`` or reset an existing checkout to change platforms.
+
+If Zig's first libc build stalls on Windows-mounted cache files, select a cache
+on the Linux filesystem explicitly (a Make command-line variable overrides the
+checkout-local default):
+
+.. code-block:: sh
+
+   make riscv-wasm ZIG_GLOBAL_CACHE_DIR=/var/tmp/trs-risc-zig-cache
+
+Use the same override for subsequent cross/WASM Make commands. Host validation
+can use ``make test CFLAGS=-O0``, matching CI and avoiding expensive GCC
+optimization of the large generated workbench translation. These choices do not
+change the ROM, BASIC program or target ISA.
