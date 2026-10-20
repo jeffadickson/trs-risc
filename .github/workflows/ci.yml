@@ -29,6 +29,7 @@ jobs:
           make test-riscv
           make test-wasm
           make test-riscv-wasm
+          make test-et-rel-wasm
       - name: Sphinx manual and measured code sizes
         if: always()
         run: make docs

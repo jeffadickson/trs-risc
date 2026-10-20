@@ -24,7 +24,11 @@ export async function createRiscvMachine(wasmBytes, elfBytes, write = () => {}, 
   if (!Number.isInteger(options.base ?? 0) || (options.base ?? 0) < 0 || (options.base ?? 0) >= 0x2000000 || (options.base ?? 0) % 4096) throw new Error('Invalid PIE load base.');
   let instance, pending = '';
   const decoder = new TextDecoder(), elf = new Uint8Array(elfBytes);
-  const z80 = symbol(elf, 'mem');
+  // ET_REL symbols are section-relative, not virtual addresses plus a bias.
+  // The generic CPU can run an object, but BASIC image controls need a future
+  // resolved-symbol API. Never guess an object's mem address using PIE rules.
+  const isObject = elf[16] === 1 && elf[17] === 0;
+  const z80 = isObject ? null : symbol(elf, 'mem');
   const wasi = {
     args_get(){return 0;},args_sizes_get(count,size){const view=new DataView(instance.exports.memory.buffer);view.setUint32(count,0,true);view.setUint32(size,0,true);return 0;},
     fd_close(){return 0;},fd_seek(){return 29;},

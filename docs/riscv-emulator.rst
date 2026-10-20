@@ -35,7 +35,7 @@ point routines still work: they are software algorithms implemented in Z80 and
 translated into RV64 integer operations. The normal RV64GC QEMU build is a
 separate artifact and is intentionally rejected by this CPU's loader.
 
-The loader accepts little-endian ELF64 ET_EXEC and self-contained static PIE
+The executable loader accepts little-endian ELF64 ET_EXEC and self-contained static PIE
 ET_DYN for machine 243 (RISC-V).
 It checks file/segment bounds, load addresses, entry alignment and ABI flags,
 rejects PT_INTERP/dynamic executables, zeros guest RAM and maps PT_LOAD segments.
@@ -43,6 +43,9 @@ It constructs a Linux entry stack containing argc, argv, environment terminator
 and auxiliary vector (PHDR, page size, entry, IDs and deterministic AT_RANDOM).
 It applies the constrained static PIE relocations described below; it does not
 resolve shared-library symbols or emulate a privileged board/MMU.
+
+A separate :doc:`et-rel` path places sections and resolves symbols for one
+freestanding object with a deliberately small NONE/64 relocation subset.
 
 Sandboxed Linux calls
 ---------------------
@@ -119,7 +122,7 @@ be present. Destination words must be aligned writable data, not text or the
 relocation table itself. Signed addends, segment addresses and table extents are
 checked before arithmetic can escape guest RAM. The complete table is validated
 before applying any write. DT_NEEDED, PT_INTERP/TLS, REL/RELR, PLT/symbol and text
-relocations fail explicitly. This does not link ET_REL object files, resolve
+relocations fail explicitly. This PIE path does not link ET_REL object files, resolve
 symbols across libraries, or implement a dynamic linker.
 
 The browser defaults to the BASIC PIE at 4 MB. ``?base=0xc00000`` moves it to

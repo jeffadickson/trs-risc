@@ -241,7 +241,7 @@ static void step(void){
 }
 
 /* ELF64 little-endian reads are separate from guest loads: file offsets are
-   bounded by file length, not RAM_SIZE. Loader accepts static ET_EXEC only. */
+   bounded by file length, not RAM_SIZE. ELF types have separate loading paths. */
 static uint64_t elf_value(unsigned offset,unsigned width,unsigned length){
     if(offset>length||width>length-offset){fault("truncated ELF");return 0;}
     uint64_t value=0;for(unsigned index=0;index<width;index++)value|=(uint64_t)elf_image[offset+index]<<(index*8);return value;
@@ -302,15 +302,34 @@ static int relocate_pie(uint64_t dynamic,uint64_t size){
     return state!=FAULTED;
 }
 
+/* Construct only the supplied startup metadata. ET_EXEC/PIE provide Linux PHDR
+   and deterministic AT_RANDOM entries; freestanding ET_REL has no input PHDR.
+   Arguments are bounded before writing so failure never underflows the stack. */
+static int startup_stack(int argc,const char *const *argv,const uint64_t *aux,unsigned aux_words){
+    uint64_t stack=STACK_TOP,pointers[32];if(argc<1||argc>32){fault("invalid guest argc");return 0;}
+    for(int index=0;index<argc;index++)if(strlen(argv[index])>65535){fault("guest argument too large");return 0;}
+    for(int index=argc-1;index>=0;index--){size_t amount=strlen(argv[index])+1;stack-=amount;memcpy(guest_ram+stack,argv[index],amount);pointers[index]=stack;}
+    /* Keep the original executable startup's deterministic random bytes at the
+       same address; ET_REL does not advertise them through its auxiliary vector. */
+    stack-=16;for(unsigned index=0;index<16;index++)guest_ram[stack+index]=(unsigned char)(index*17+3);
+    unsigned words=(unsigned)argc+3+aux_words;stack=(stack-words*8)&~UINT64_C(15);registers[2]=stack;
+    store(stack,argc,8);stack+=8;for(int index=0;index<argc;index++,stack+=8)store(stack,pointers[index],8);
+    store(stack,0,8);stack+=8;store(stack,0,8);stack+=8;for(unsigned index=0;index<aux_words;index++,stack+=8)store(stack,aux[index],8);
+    return state!=FAULTED;
+}
+
+#include "et_rel.inc"
+
 /* ET_EXEC keeps its link-time addresses. A static ET_DYN image receives a
    page-aligned load bias (default 4 MB); every segment, entry, PHDR, brk and
    auxiliary-vector address uses that bias consistently. PT_INTERP and symbol
-   linking remain explicitly unsupported. This is a loader, not an ET_REL linker. */
+   linking remain explicitly unsupported. ET_REL uses its own section linker. */
 static int boot_elf_at(unsigned length,int argc,const char *const *argv,uint64_t requested_bias){
     state=RUNNING;fault_message[0]=0;memset(registers,0,sizeof registers);memset(guest_ram,0,sizeof guest_ram);
     guest_pc=instructions=heap_end=load_bias=0;extent_count=0;map_end=32u*1024u*1024u;reservation_valid=key_read=key_write=exit_status=0;
     if(length<64||length>ELF_LIMIT||memcmp(elf_image,"\177ELF",4)||elf_image[4]!=2||elf_image[5]!=1||elf_value(18,2,length)!=243){fault("expected little-endian RV64 ELF64");return 0;}
     uint64_t type=elf_value(16,2,length);
+    if(type==1)return boot_rel(length,argc,argv,requested_bias);
     if(type!=2&&type!=3){fault("expected ET_EXEC or static PIE ET_DYN");return 0;}
     if(type==2&&requested_bias){fault("ET_EXEC cannot be rebased");return 0;}
     load_bias=type==3?(requested_bias?requested_bias:4u*1024u*1024u):0;
@@ -343,14 +362,11 @@ static int boot_elf_at(unsigned length,int argc,const char *const *argv,uint64_t
     heap_end=align_page(heap_end);
     /* Linux entry stack: argc, argv[], NULL, envp NULL, auxv key/value pairs.
        AT_RANDOM is fixed demo data; it is not cryptographic entropy. */
-    uint64_t stack=STACK_TOP,pointers[32];if(argc<1||argc>32){fault("invalid guest argc");return 0;}
-    for(int index=argc-1;index>=0;index--){size_t amount=strlen(argv[index])+1;if(amount>65536){fault("guest argument too large");return 0;}stack-=amount;memcpy(guest_ram+stack,argv[index],amount);pointers[index]=stack;}
-    stack-=16;uint64_t random=stack;for(unsigned index=0;index<16;index++)guest_ram[stack+index]=(unsigned char)(index*17+3);
+    uint64_t random=STACK_TOP-16;
+    if(argc<1||argc>32){fault("invalid guest argc");return 0;}
+    for(int index=0;index<argc;index++){size_t amount=strlen(argv[index])+1;if(amount>65536){fault("guest argument too large");return 0;}random-=amount;}
     uint64_t aux[]={3,phdr,4,phsize,5,phcount,6,PAGE,7,0,9,guest_pc,11,1000,12,1000,13,1000,14,1000,16,(1u<<8)|(1u<<12)|1u,23,0,25,random,0,0};
-    unsigned words=(unsigned)argc+3+(unsigned)(sizeof aux/sizeof aux[0]);stack=(stack-words*8)&~UINT64_C(15);registers[2]=stack;
-    store(stack,argc,8);stack+=8;for(int index=0;index<argc;index++,stack+=8)store(stack,pointers[index],8);
-    store(stack,0,8);stack+=8;store(stack,0,8);stack+=8;for(unsigned index=0;index<sizeof aux/sizeof aux[0];index++,stack+=8)store(stack,aux[index],8);
-    return state!=FAULTED;
+    return startup_stack(argc,argv,aux,sizeof aux/sizeof aux[0]);
 }
 static int boot_elf(unsigned length,int argc,const char *const *argv){return boot_elf_at(length,argc,argv,0);}
 

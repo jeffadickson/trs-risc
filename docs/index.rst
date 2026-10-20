@@ -22,6 +22,7 @@ Repository: https://github.com/jeffadickson/trs-risc
    basic-workbench
    browser
    riscv-emulator
+   et-rel
    et-rel-plan
    source-reference
    sizes

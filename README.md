@@ -14,8 +14,11 @@ There are two browser execution paths:
 The default path runs real RISC-V instructions. The emulator is a small stripped
 WASM module and has a static ELF loader, bounded guest RAM and a small Linux syscall
 layer. Static PIE supports checked `R_RISCV_RELATIVE` relocations at a chosen
-base (`?base=0xc00000` tries 12 MB). This does not link `.o` files or shared
-libraries. RV64I, M, and single-hart A are implemented; C/F/D, privileged hardware,
+base (`?base=0xc00000` tries 12 MB). That PIE path does not link `.o` files or shared
+libraries. A separate first-stage ET_REL linker runs one freestanding object
+with defined symbols and checked NONE/64 data relocations (see
+[its supported subset](docs/et-rel.rst)); it does not link arbitrary compiler
+output or multiple objects. RV64I, M, and single-hart A are implemented; C/F/D, privileged hardware,
 an MMU, threads, dynamic linking and general Linux compatibility are not.
 
 ```sh
@@ -26,6 +29,7 @@ make test
 make bootstrap-riscv        # local Zig compiler + QEMU if needed
 make riscv-wasm             # actual RV64IMA guest ELF + WASM RISC-V CPU
 make test-riscv-wasm         # CPU/WASM behavior and same-ELF QEMU comparison
+make test-et-rel-wasm        # single-object linking, malformed inputs, QEMU oracle
 make serve                  # C# server: http://localhost:8080/
 make docs                   # strict Sphinx build: build/docs/html/index.html
 ```

@@ -4,13 +4,16 @@ ET_REL linking: proposed next stages
 Status and boundary
 -------------------
 
-This is a plan, not implemented functionality. The current loader in
+The first single-object NONE/64 milestone is now implemented; see
+:doc:`et-rel` for its exact supported subset, entry contract and tests.
+The remaining symbol-resolution and instruction-relocation stages below are
+proposals, not implemented functionality. The executable loader in
 ``src/rv/rv64.c`` accepts ET_EXEC and constrained static ET_DYN. It consumes
 program headers and applies symbol-free dynamic RELA entries. ET_REL needs a
 separate section-based path; loosening the existing PIE checks would not provide
 object linking. Keep the current executable loader and its tests intact.
 
-The first milestone should load one freestanding RV64IMA/LP64 object containing
+The original first milestone called for one freestanding RV64IMA/LP64 object containing
 ``_start``, initialized data, BSS and a relocated data pointer, then run it in the
 native CPU and the WASM CPU at two bases. No libc, archives, shared objects, TLS,
 compressed instructions, floating-point ABI, GOT/PLT construction or relaxation

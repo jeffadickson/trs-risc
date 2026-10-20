@@ -22,6 +22,7 @@ Hidden WZ behavior, real interrupts and cycle timing are outside these tests.
    make test-riscv   # native RV64 ELF behavior through QEMU
    make test-wasm    # compiled WASM through the exact browser host adapter
    make test-elf-loader # static PIE relocations and malformed ELF tests
+   make test-et-rel-wasm # single-object linking, malformed ET_REL, QEMU oracle
    make test-riscv-wasm # full BASIC PIE at two bases, plus QEMU comparison
    make test-browser # optional real Chromium UI test
    make docs         # strict Sphinx warning/reference checks

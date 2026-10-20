@@ -25,6 +25,18 @@ int main(int argc,char **argv){
     assert(rela_file&&rela_tag&&rela_size_tag&&rela_entry_tag);
     for(unsigned index=0;index<2;index++){
         restore();uint64_t bias=index?0xc00000:0x400000;assert(boot(bias));assert(load_bias==bias);
+        /* Sharing stack construction with ET_REL must not remove executable
+           PHDR/AT_RANDOM metadata or change Linux argc/argv alignment. */
+        uint64_t stack=registers[2];assert(!(stack&15)&&load(stack,8)==1);
+        assert(!strcmp((const char *)guest_ram+load(stack+8,8),"pie-test"));
+        unsigned found=0;
+        for(unsigned word=4;word<64;word+=2){
+            uint64_t tag=load(stack+word*8,8),pointer=load(stack+(word+1)*8,8);if(!tag)break;
+            if(tag==3){assert(mapped(pointer,56,4));found|=1;}
+            if(tag==9){assert(pointer==guest_pc);found|=2;}
+            if(tag==25){assert(range(pointer,16));for(unsigned byte=0;byte<16;byte++)assert(guest_ram[pointer+byte]==(unsigned char)(byte*17+3));found|=4;}
+        }
+        assert(found==7);
         uint64_t relocation=elf_value(rela_file,8,file_length),addend=elf_value(rela_file+16,8,file_length);
         assert(load(bias+relocation,8)==bias+addend);
         for(unsigned tick=0;tick<10000&&state==RUNNING;tick++)step();

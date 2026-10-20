@@ -107,9 +107,10 @@ RV_EXPORTS = rv_boot_at rv_load_bias rv_image_pointer rv_image_limit rv_boot rv_
 build/trs80-rv64im: src/runtime.c build/translated.inc Makefile
 	$(RV_GUEST_CC) $(RV_GUEST_FLAGS) -Ibuild $< -o $@.full
 	$(RV_OBJCOPY) --strip-debug $@.full $@
-build/rv-run: src/rv/rv64.c
+build/rv-run: src/rv/rv64.c src/rv/et_rel.inc
+	mkdir -p build
 	$(CC) -O2 $< -o $@
-web/rv64.wasm: src/rv/rv64.c
+web/rv64.wasm: src/rv/rv64.c src/rv/et_rel.inc
 	$(WASM_CC) -O2 -mexec-model=reactor -DRV_NO_MAIN -Wl,--strip-all $< -Wl,--no-entry $(foreach symbol,$(RV_EXPORTS),-Wl,--export=$(symbol)) -o $@
 web/trs80-rv64im.elf: build/trs80-rv64im
 	cp $< $@
@@ -122,7 +123,7 @@ test-riscv-wasm: riscv-wasm build/rv-run
 .PHONY: ensure-zig test-rv-cpu
 ensure-zig:
 	@test -n '$(ZIG)' || sh tools/bootstrap.sh riscv
-build/rv-cpu-test: tests/rv_cpu.c src/rv/rv64.c
+build/rv-cpu-test: tests/rv_cpu.c src/rv/rv64.c src/rv/et_rel.inc
 	$(CC) -O2 $< -o $@
 test-rv-cpu: build/rv-cpu-test
 	build/rv-cpu-test
@@ -132,7 +133,7 @@ test-riscv-wasm: test-rv-cpu
 .PHONY: test-elf-loader
 build/pie-guest: tests/pie_start.S tests/pie_guest.c
 	$(RV_GUEST_CC) -mcpu=generic_rv64+m+a-c-d-f -mabi=lp64 -fPIE -pie -nostdlib -static -Wl,-e,_start -O1 $^ -o $@
-build/elf-loader-test: tests/elf_loader.c src/rv/rv64.c
+build/elf-loader-test: tests/elf_loader.c src/rv/rv64.c src/rv/et_rel.inc
 	$(CC) -O2 $< -o $@
 test-elf-loader: build/pie-guest build/elf-loader-test
 	build/elf-loader-test
@@ -144,3 +145,21 @@ web/trs80-pie.elf: build/trs80-pie
 riscv-wasm: test-elf-loader
 
 test-browser: riscv-wasm
+
+# Section-based single-object linker. The ordinary linker/QEMU path is an
+# independent output oracle; our runtime consumes the unlinked .o instead.
+.PHONY: test-et-rel test-et-rel-wasm
+build/rel-guest.o: tests/rel_guest.S | ensure-zig
+	mkdir -p build
+	$(RV_GUEST_CC) -mcpu=generic_rv64+m+a-c-d-f -mabi=lp64 -mno-relax -g0 -c $< -o $@
+build/rel-oracle: build/rel-guest.o
+	$(RV_GUEST_CC) -mcpu=generic_rv64+m+a-c-d-f -mabi=lp64 -mno-relax -nostdlib -static -Wl,-e,_start $< -o $@
+build/et-rel-test: tests/et_rel.c src/rv/rv64.c src/rv/et_rel.inc
+	mkdir -p build
+	$(CC) -O2 $< -o $@
+test-et-rel: build/rel-guest.o build/rel-oracle build/et-rel-test build/rv-run
+	build/et-rel-test
+	QEMU="$(QEMU)" node tests/et-rel.mjs native
+test-et-rel-wasm: test-et-rel
+	$(MAKE) web/rv64.wasm
+	QEMU="$(QEMU)" node tests/et-rel.mjs wasm
