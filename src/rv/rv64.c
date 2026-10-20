@@ -269,14 +269,14 @@ static int mapped(uint64_t address,uint64_t length,unsigned required){
 static int relocate_pie(uint64_t dynamic,uint64_t size){
     if(!dynamic)return 1;
     if(size<16||size%16||!mapped(dynamic,size,4)){fault("unmapped/truncated PT_DYNAMIC");return 0;}
-    uint64_t rela=0,bytes=0,entry=0;unsigned found=0;
+    uint64_t rela=0,bytes=0,entry=0;unsigned found=0,seen=0;
     for(uint64_t position=0;position<size;position+=16){
         uint64_t tag=load(dynamic+position,8),value=load(dynamic+position+8,8);
         if(!tag){found=1;break;}
         switch(tag){
-        case 7:if(rela){fault("duplicate DT_RELA");return 0;}rela=value;break;
-        case 8:if(bytes){fault("duplicate DT_RELASZ");return 0;}bytes=value;break;
-        case 9:if(entry){fault("duplicate DT_RELAENT");return 0;}entry=value;break;
+        case 7:if(seen&1){fault("duplicate DT_RELA");return 0;}seen|=1;rela=value;break;
+        case 8:if(seen&2){fault("duplicate DT_RELASZ");return 0;}seen|=2;bytes=value;break;
+        case 9:if(seen&4){fault("duplicate DT_RELAENT");return 0;}seen|=4;entry=value;break;
         case 1:case 17:case 18:case 19:case 22:case 35:case 36:case 37:
             fault("PIE needs unsupported dependencies, REL/RELR or text relocations");return 0;
         case 2:case 23:if(value){fault("PIE PLT/symbol linking not supported");return 0;}break;
@@ -337,8 +337,8 @@ static int boot_elf_at(unsigned length,int argc,const char *const *argv,uint64_t
     }
     if(!mapped(guest_pc,4,1)||(guest_pc&3)||!phdr){fault("ELF entry/PHDR is not mapped");return 0;}
     if(type==3&&!relocate_pie(dynamic,dynamic_size))return 0;
-    /* Fixed-address static executables can carry dynamic metadata, but may not
-       ask this loader for relocations: applying them twice would be incorrect. */
+    /* ET_EXEC dynamic processing is outside this loader subset. Do not infer
+       a dynamic-linking ABI from the presence of a PT_DYNAMIC header alone. */
     if(type==2&&dynamic){fault("ET_EXEC dynamic metadata not supported");return 0;}
     heap_end=align_page(heap_end);
     /* Linux entry stack: argc, argv[], NULL, envp NULL, auxv key/value pairs.
