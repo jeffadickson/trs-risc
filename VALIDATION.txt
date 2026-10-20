@@ -1,0 +1,54 @@
+Validation in this workspace (2026-10-20 UTC)
+
+HOST
+mkdir -p build
+python3 tools/translate.py vendor/model1-level2.rom build/translated.inc
+{"bytes": 12288, "entry_points": 12288, "sha256": "3cd3824d2ac2743750d2179951ed812794302b885ccb4f98aa2579b352c4b00e", "truncated_entry_points": []}
+cc -O0 -Ibuild src/runtime.c -o build/trs80-host
+cc -O0 -Ibuild tests/lockstep.c tests/reference/z80.c -o build/lockstep
+python3 tests/opcodes.py build/opcodes
+cc -O0 -Ibuild/opcodes tests/opcodes.c tests/reference/z80.c -o build/opcode-test
+build/lockstep
+PASS: 628344 translated instructions/events in lockstep; 81 input bytes; complete memory matches
+build/opcode-test
+PASS: 25616 differential single-instruction cases (7 opcode families, 16 register states; documented flags)
+python3 tests/smoke.py build/trs80-host
+PASS: arithmetic
+PASS: stored program
+PASS: FOR/NEXT
+PASS: floating point
+PASS: strings
+PASS: raw ROM video-memory boot (expected step limit)
+PASS: infinite BASIC program stops at instruction budget
+
+RV64 LINUX UNDER QEMU 10.0.13
+/workspace/trs80-riscv/.toolchain/ziglang/zig cc -target riscv64-linux-musl -O1 -g0 -Ibuild src/runtime.c -o build/trs80-riscv64
+python3 tests/smoke.py /workspace/trs80-riscv/.toolchain/qemu/usr/bin/qemu-riscv64 build/trs80-riscv64
+PASS: arithmetic
+PASS: stored program
+PASS: FOR/NEXT
+PASS: floating point
+PASS: strings
+PASS: raw ROM video-memory boot (expected step limit)
+PASS: infinite BASIC program stops at instruction budget
+
+RV64 DEMO OUTPUT
+MEMORY SIZE? 
+RADIO SHACK LEVEL II BASIC
+READY
+>
+>10 PRINT "HELLO FROM RISC-V"
+>20 FOR I=1 TO 5
+>30 PRINT I;I*I
+>40 NEXT I
+>50 END
+>RUN
+HELLO FROM RISC-V
+ 1  1 
+ 2  4 
+ 3  9 
+ 4  16 
+ 5  25 
+READY
+>
+steps=601005 pc=002b ram_hooks=654 input=83/83

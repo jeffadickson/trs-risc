@@ -1,0 +1,13 @@
+build/
+.toolchain/
+__pycache__/
+*.pyc
+vendor/*.rom
+*.zip
+**/bin/
+**/obj/
+*.basram
+*.wasm
+*.elf
+docs/_generated/
+core

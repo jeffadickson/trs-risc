@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>trs-risc · Level II BASIC</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header><p class="eyebrow">1978 MEETS WEBASSEMBLY</p><h1>TRS-80, another life.</h1>
+    <p>The original BASIC ROM, translated to RISC-V and running inside a WebAssembly RISC-V CPU.</p>
+    <p id="engine">RV64 ELF → RISC-V CPU → WebAssembly</p><p class="status" id="status" role="status">Loading BASIC…</p></header>
+  <section class="terminal-frame" aria-label="BASIC terminal">
+    <div class="terminal-bar"><span>RADIO SHACK · LEVEL II</span><span id="steps">0 steps</span></div>
+    <pre id="terminal" tabindex="0" aria-label="BASIC output" aria-live="off"></pre>
+    <form id="command-form"><label for="command">&gt;</label><input id="command" autocomplete="off" spellcheck="false" aria-label="BASIC command" placeholder='PRINT "HELLO"' disabled><button id="send" disabled>Enter ↵</button></form>
+  </section>
+  <nav aria-label="BASIC controls"><button id="demo" disabled>Run demo</button><button id="pause" disabled>Pause</button><button id="reset" disabled>Reset BASIC</button><button id="save" disabled>Save program image</button><label class="file-button">Load program image<input id="load" type="file" accept=".basram,application/octet-stream" disabled></label></nav>
+  <section class="editor"><div><h2>Your BASIC, in the browser.</h2><p>Edit the numbered program, then send it to the original ROM tokenizer. Use the command line above for direct commands and INPUT responses.</p><p>Save and load the same raw <code>.basram</code> images as the C workbench. Images contain your tokenized program, not the interpreter ROM.</p></div><div><label for="source">Numbered BASIC source</label><textarea id="source" spellcheck="false" rows="8" aria-label="Numbered BASIC source"></textarea><button id="run-source" disabled>Run this program</button></div></section>
+  <footer><a href="?engine=direct">Try direct WASM</a><a href="https://github.com/jeffadickson/trs-risc">Source &amp; documentation</a><span>Console prototype · no disk or cassette hardware · Reset stops any program</span></footer>
+</main>
+<script type="module" src="app.mjs"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+name: Build and validate
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.413'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Host tools and BASIC workbench
+        run: make test CFLAGS=-O0
+      - name: Cross tools
+        run: make bootstrap-riscv
+      - name: Native RISC-V, direct WASM, and RV64-emulator WASM
+        run: |
+          make test-riscv
+          make test-wasm
+          make test-riscv-wasm
+      - name: Sphinx manual and measured code sizes
+        run: make docs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-and-documentation
+          path: |
+            build/docs/html/
+            docs/_generated/
