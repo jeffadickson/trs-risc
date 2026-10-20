@@ -10,8 +10,13 @@ public static class Server
     public static void Run(string directory, int port)
     {
         string root = Path.GetFullPath(directory) + Path.DirectorySeparatorChar;
-        using var listener = new HttpListener(); listener.Prefixes.Add($"http://localhost:{port}/"); listener.Start();
-        Console.WriteLine($"trs-risc browser BASIC: http://localhost:{port}/ (Ctrl-C to stop)");
+        using var listener = new HttpListener();
+        listener.Prefixes.Add($"http://localhost:{port}/");
+        // Windows may prefer IPv6 localhost while WSL forwards only IPv4.
+        // Accept the explicit loopback host too, without exposing a LAN prefix.
+        listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+        listener.Start();
+        Console.WriteLine($"trs-risc browser BASIC: http://localhost:{port}/ or http://127.0.0.1:{port}/ (Ctrl-C to stop)");
         while (true)
         {
             HttpListenerContext context = listener.GetContext();

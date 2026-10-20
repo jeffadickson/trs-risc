@@ -128,7 +128,9 @@ with LF line endings so shell scripts remain executable by a POSIX shell:
    make serve
 
 Open http://localhost:8080/ in the Windows browser. WSL localhost forwarding
-must be enabled. The default runs the RV64 PIE through the WASM CPU; use
+must be enabled. If Windows prefers an unresponsive IPv6 localhost address,
+use http://127.0.0.1:8080/ instead; the C# server accepts both loopback host
+names. The default runs the RV64 PIE through the WASM CPU; use
 ``?base=0xc00000`` for 12 MB, ``?elf=exec`` for fixed-address ELF, and
 ``?engine=direct`` for the separate direct WASM comparison.
 
