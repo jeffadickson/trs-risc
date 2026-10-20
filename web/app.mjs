@@ -1,6 +1,9 @@
 import { createMachine } from './runtime.mjs';
 import { createRiscvMachine } from './riscv.mjs';
-const direct = new URLSearchParams(location.search).get('engine') === 'direct';
+const settings = new URLSearchParams(location.search);
+const direct = settings.get('engine') === 'direct';
+const pie = settings.get('elf') !== 'exec';
+const base = Number(settings.get('base') ?? '0x400000');
 const $ = id => document.getElementById(id);
 let machine, running = false, scheduled = false, generation = 0, transcript = '', output = '';
 let waiters = [];
@@ -72,10 +75,11 @@ try {
   const module = await response.arrayBuffer();
   if (direct) machine = await createMachine(module, text => { output += text; });
   else {
-    const guest = await fetch('trs80-rv64im.elf'); if (!guest.ok) throw new Error('RV64 guest ELF missing. Run make riscv-wasm.');
-    machine = await createRiscvMachine(module, await guest.arrayBuffer(), text => { output += text; });
+    if (!Number.isInteger(base) || base < 0 || base >= 0x2000000 || base % 4096) throw new Error('PIE base must be page aligned and below 32 MB.');
+    const guest = await fetch(pie ? 'trs80-pie.elf' : 'trs80-rv64im.elf'); if (!guest.ok) throw new Error('RV64 guest ELF missing. Run make riscv-wasm.');
+    machine = await createRiscvMachine(module, await guest.arrayBuffer(), text => { output += text; }, {base:pie ? base : 0});
   }
-  $('engine').textContent = direct ? 'Direct C → WebAssembly' : 'RV64 ELF → RISC-V CPU → WebAssembly';
+  $('engine').textContent = direct ? 'Direct C → WebAssembly' : `RV64 ${pie ? 'PIE @ 0x'+base.toString(16) : 'ELF'} → RISC-V CPU → WebAssembly`;
   $('source').value = await (await fetch('demo.bas')).text();
   for (const id of ['command','send','demo','pause','reset','save','load','run-source']) $(id).disabled = false;
   await boot(); $('command').focus(); document.documentElement.dataset.booted = 'true';

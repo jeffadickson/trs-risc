@@ -20,7 +20,8 @@ function symbol(elf, wanted) {
   }
   return null;
 }
-export async function createRiscvMachine(wasmBytes, elfBytes, write = () => {}) {
+export async function createRiscvMachine(wasmBytes, elfBytes, write = () => {}, options = {}) {
+  if (!Number.isInteger(options.base ?? 0) || (options.base ?? 0) < 0 || (options.base ?? 0) >= 0x2000000 || (options.base ?? 0) % 4096) throw new Error('Invalid PIE load base.');
   let instance, pending = '';
   const decoder = new TextDecoder(), elf = new Uint8Array(elfBytes);
   const z80 = symbol(elf, 'mem');
@@ -35,10 +36,11 @@ export async function createRiscvMachine(wasmBytes, elfBytes, write = () => {}) 
     wasi_snapshot_preview1:wasi,
   })).instance;
   const api=instance.exports;
+  if (api._initialize) api._initialize();
   function fault(){const bytes=new Uint8Array(api.memory.buffer),start=api.rv_fault_pointer();return new Error(decoder.decode(bytes.subarray(start,bytes.indexOf(0,start))));}
   function memory(){
-    if(!z80||z80.size!==65536||z80.address+65536>api.rv_memory_size())throw new Error('This ELF has no known BASIC memory symbol.');
-    return new DataView(api.memory.buffer,api.rv_memory_pointer()+z80.address,65536);
+    if(!z80||z80.size!==65536||z80.address+api.rv_load_bias()+65536>api.rv_memory_size())throw new Error('This ELF has no known BASIC memory symbol.');
+    return new DataView(api.memory.buffer,api.rv_memory_pointer()+api.rv_load_bias()+z80.address,65536);
   }
   function validate(image){
     if(image.length<2||image.length>0xad17)throw new Error('Invalid BASIC image length.');
@@ -55,7 +57,7 @@ export async function createRiscvMachine(wasmBytes, elfBytes, write = () => {}) 
   }
   let lastState=0;
   return {
-    reset(){pending='';if(elf.length>api.rv_image_limit())throw new Error('ELF exceeds emulator upload limit.');new Uint8Array(api.memory.buffer,api.rv_image_pointer(),elf.length).set(elf);if(!api.rv_boot(elf.length))throw fault();lastState=0;},
+    reset(){pending='';if(elf.length>api.rv_image_limit())throw new Error('ELF exceeds emulator upload limit.');new Uint8Array(api.memory.buffer,api.rv_image_pointer(),elf.length).set(elf);if(!api.rv_boot_at(elf.length, options.base ?? 0))throw fault();lastState=0;},
     input(text){if(/[^\x00-\x7f]/.test(text))throw new Error('Input must be ASCII.');pending+=text;},
     runSlice(budget=100000){let count=0;while(count<pending.length&&api.rv_enqueue(pending.charCodeAt(count)))count++;pending=pending.slice(count);lastState=api.rv_run(budget);if(lastState===3)throw fault();if(lastState===2&&api.rv_exit_status())throw new Error(`RISC-V guest exited with status ${api.rv_exit_status()}`);return lastState===1&&pending.length?0:lastState;},
     steps(){return api.rv_steps();},

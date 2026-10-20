@@ -35,12 +35,14 @@ point routines still work: they are software algorithms implemented in Z80 and
 translated into RV64 integer operations. The normal RV64GC QEMU build is a
 separate artifact and is intentionally rejected by this CPU's loader.
 
-The loader accepts static, little-endian ELF64 ET_EXEC for machine 243 (RISC-V).
+The loader accepts little-endian ELF64 ET_EXEC and self-contained static PIE
+ET_DYN for machine 243 (RISC-V).
 It checks file/segment bounds, load addresses, entry alignment and ABI flags,
 rejects PT_INTERP/dynamic executables, zeros guest RAM and maps PT_LOAD segments.
 It constructs a Linux entry stack containing argc, argv, environment terminator
 and auxiliary vector (PHDR, page size, entry, IDs and deterministic AT_RANDOM).
-It does not perform dynamic relocation or emulate a privileged board/MMU.
+It applies the constrained static PIE relocations described below; it does not
+resolve shared-library symbols or emulate a privileged board/MMU.
 
 Sandboxed Linux calls
 ---------------------
@@ -87,3 +89,47 @@ claim or an exhaustive ISA-conformance result.
 .. literalinclude:: ../src/rv/rv64.c
    :language: c
    :linenos:
+
+Static PIE relocation
+---------------------
+
+The loader additionally accepts self-contained ET_DYN images with no interpreter
+or shared-library dependencies. A page-aligned load bias defaults to 4 MB and can
+be selected explicitly:
+
+.. code-block:: sh
+
+   build/rv-run --base 0x400000 build/trs80-pie
+   build/rv-run --base 0xc00000 build/trs80-pie
+   make test-elf-loader
+
+The bias is added to PT_LOAD virtual addresses, entry point, dynamic-table
+pointers, program-header and auxiliary-vector addresses, and heap boundaries.
+ET_EXEC remains fixed-address and rejects a requested nonzero bias.
+
+PT_DYNAMIC is parsed for DT_RELA/DT_RELASZ/DT_RELAENT. Only symbol-free
+``R_RISCV_RELATIVE`` (3) and empty ``R_RISCV_NONE`` entries are supported:
+
+.. code-block:: text
+
+   *(load_bias + r_offset) = load_bias + signed_r_addend
+
+Relocation tables must be mapped, correctly sized, and terminated metadata must
+be present. Destination words must be aligned writable data, not text or the
+relocation table itself. Signed addends, segment addresses and table extents are
+checked before arithmetic can escape guest RAM. The complete table is validated
+before applying any write. DT_NEEDED, PT_INTERP/TLS, REL/RELR, PLT/symbol and text
+relocations fail explicitly. This does not link ET_REL object files, resolve
+symbols across libraries, or implement a dynamic linker.
+
+The browser defaults to the BASIC PIE at 4 MB. ``?base=0xc00000`` moves it to
+12 MB; ``?elf=exec`` selects the old fixed-address ELF. The JS memory-image
+adapter adds the load bias to the BASIC memory symbol, so saved Z80 program
+images are identical at either native load address. ``rv_boot_at`` and
+``rv_load_bias`` expose this to WASM hosts; ``rv_boot`` keeps default behavior.
+
+The small ``pie-guest`` fixture is linked from C/assembly without libc or a
+self-relocating CRT. It exercises genuine linker-produced data/function RELA
+entries, BSS and startup pointers, proving relocation is performed by the
+loader. Tests also run the complete BASIC PIE at two bases and compare saved
+program images byte-for-byte.

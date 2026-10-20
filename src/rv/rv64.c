@@ -246,25 +246,100 @@ static uint64_t elf_value(unsigned offset,unsigned width,unsigned length){
     if(offset>length||width>length-offset){fault("truncated ELF");return 0;}
     uint64_t value=0;for(unsigned index=0;index<width;index++)value|=(uint64_t)elf_image[offset+index]<<(index*8);return value;
 }
-static int boot_elf(unsigned length,int argc,const char *const *argv){
+/* Loaded PT_LOAD extents are kept independently of the RAM bounds check.
+   Relocation tables must be mapped input, and relocation destinations writable
+   guest data, never the host array, ELF file buffer or executable text. */
+typedef struct {uint64_t address,size;unsigned flags;} LoadExtent;
+static LoadExtent extents[128];
+static unsigned extent_count;
+static uint64_t load_bias;
+static int mapped(uint64_t address,uint64_t length,unsigned required){
+    for(unsigned index=0;index<extent_count;index++){
+        LoadExtent *part=&extents[index];
+        if((part->flags&required)==required&&address>=part->address&&address-part->address<=part->size&&length<=part->size-(address-part->address))return 1;
+    }
+    return 0;
+}
+
+/* Static PIE has no runtime linker. DT_RELA entries of R_RISCV_RELATIVE(3)
+   explicitly request: *(bias + r_offset) = bias + signed r_addend.
+   No symbol lookup or executable instruction patching is performed here.
+   Validate the complete table BEFORE applying any write: a corrupt relocation
+   must not rewrite its own table or change another relocation's meaning. */
+static int relocate_pie(uint64_t dynamic,uint64_t size){
+    if(!dynamic)return 1;
+    if(size<16||size%16||!mapped(dynamic,size,4)){fault("unmapped/truncated PT_DYNAMIC");return 0;}
+    uint64_t rela=0,bytes=0,entry=0;unsigned found=0;
+    for(uint64_t position=0;position<size;position+=16){
+        uint64_t tag=load(dynamic+position,8),value=load(dynamic+position+8,8);
+        if(!tag){found=1;break;}
+        switch(tag){
+        case 7:if(rela){fault("duplicate DT_RELA");return 0;}rela=value;break;
+        case 8:if(bytes){fault("duplicate DT_RELASZ");return 0;}bytes=value;break;
+        case 9:if(entry){fault("duplicate DT_RELAENT");return 0;}entry=value;break;
+        case 1:case 17:case 18:case 19:case 22:case 35:case 36:case 37:
+            fault("PIE needs unsupported dependencies, REL/RELR or text relocations");return 0;
+        case 2:case 23:if(value){fault("PIE PLT/symbol linking not supported");return 0;}break;
+        case 30:if(value&4){fault("DT_TEXTREL not supported");return 0;}break;
+        default:break; /* Symbol/string/hash/debug metadata need no lookup. */
+        }
+    }
+    if(!found){fault("PT_DYNAMIC has no DT_NULL terminator");return 0;}
+    if(!bytes){if(entry&&entry!=24){fault("invalid empty RELA entry size");return 0;}return 1;}
+    if(!rela||entry!=24||bytes%24||rela>RAM_SIZE-load_bias||!mapped(load_bias+rela,bytes,4)){fault("invalid/unmapped RELA table");return 0;}
+    uint64_t table=load_bias+rela;
+    for(unsigned pass=0;pass<2;pass++)for(uint64_t offset=0;offset<bytes;offset+=24){
+        uint64_t destination=load(table+offset,8),info=load(table+offset+8,8),addend=load(table+offset+16,8);
+        if(!info)continue; /* R_RISCV_NONE with symbol zero: no write. */
+        if(info!=3){fault("unsupported PIE relocation (requires symbol resolution)");return 0;}
+        if(destination>RAM_SIZE-load_bias){fault("relocation destination overflow");return 0;}
+        uint64_t address=load_bias+destination;
+        __int128 value=(__int128)load_bias+(__int128)(int64_t)addend;
+        if((address&7)||!mapped(address,8,2)||mapped(address,8,1)||value<0||value>RAM_SIZE){fault("invalid PIE relocation destination/addend");return 0;}
+        if(address<table+bytes&&address+8>table){fault("relocation overlaps its own RELA table");return 0;}
+        if(pass)store(address,(uint64_t)value,8);
+    }
+    return state!=FAULTED;
+}
+
+/* ET_EXEC keeps its link-time addresses. A static ET_DYN image receives a
+   page-aligned load bias (default 4 MB); every segment, entry, PHDR, brk and
+   auxiliary-vector address uses that bias consistently. PT_INTERP and symbol
+   linking remain explicitly unsupported. This is a loader, not an ET_REL linker. */
+static int boot_elf_at(unsigned length,int argc,const char *const *argv,uint64_t requested_bias){
     state=RUNNING;fault_message[0]=0;memset(registers,0,sizeof registers);memset(guest_ram,0,sizeof guest_ram);
-    guest_pc=instructions=heap_end=0;map_end=32u*1024u*1024u;reservation_valid=key_read=key_write=exit_status=0;
-    if(length<64||length>ELF_LIMIT||memcmp(elf_image,"\177ELF",4)||elf_image[4]!=2||elf_image[5]!=1||elf_value(16,2,length)!=2||elf_value(18,2,length)!=243){fault("expected static little-endian RV64 ELF64 ET_EXEC");return 0;}
+    guest_pc=instructions=heap_end=load_bias=0;extent_count=0;map_end=32u*1024u*1024u;reservation_valid=key_read=key_write=exit_status=0;
+    if(length<64||length>ELF_LIMIT||memcmp(elf_image,"\177ELF",4)||elf_image[4]!=2||elf_image[5]!=1||elf_value(18,2,length)!=243){fault("expected little-endian RV64 ELF64");return 0;}
+    uint64_t type=elf_value(16,2,length);
+    if(type!=2&&type!=3){fault("expected ET_EXEC or static PIE ET_DYN");return 0;}
+    if(type==2&&requested_bias){fault("ET_EXEC cannot be rebased");return 0;}
+    load_bias=type==3?(requested_bias?requested_bias:4u*1024u*1024u):0;
+    if((load_bias&(PAGE-1))||load_bias>=32u*1024u*1024u){fault("invalid PIE load bias");return 0;}
     if(elf_value(48,4,length)&7){fault("ELF requires unsupported compressed or hard-float ABI");return 0;}
-    uint64_t phoff=elf_value(32,8,length),phsize=elf_value(54,2,length),phcount=elf_value(56,2,length),phdr=0;
-    guest_pc=elf_value(24,8,length);
-    if(phsize<56||phcount>128||phoff>length||phcount*phsize>length-phoff){fault("invalid ELF program headers");return 0;}
-    int entry_valid=0;
+    uint64_t phoff=elf_value(32,8,length),phsize=elf_value(54,2,length),phcount=elf_value(56,2,length),phdr=0,dynamic=0,dynamic_size=0;
+    uint64_t entry=elf_value(24,8,length);
+    if(entry>RAM_SIZE-load_bias){fault("ELF entry overflow");return 0;}guest_pc=entry+load_bias;
+    if(phsize<56||!phcount||phcount>128||phoff>length||phcount*phsize>length-phoff){fault("invalid ELF program headers");return 0;}
     for(unsigned index=0;index<phcount;index++){
-        unsigned header=(unsigned)(phoff+index*phsize);uint64_t type=elf_value(header,4,length),flags=elf_value(header+4,4,length),offset=elf_value(header+8,8,length),address=elf_value(header+16,8,length),file_size=elf_value(header+32,8,length),memory_size=elf_value(header+40,8,length);
-        if(type==3){fault("dynamic interpreter not supported");return 0;}if(type!=1)continue;
-        if(file_size>memory_size||offset>length||file_size>length-offset||address<4096||address>32u*1024u*1024u||memory_size>32u*1024u*1024u-address){fault("invalid ELF load segment");return 0;}
+        unsigned header=(unsigned)(phoff+index*phsize);
+        uint64_t kind=elf_value(header,4,length),flags=elf_value(header+4,4,length),offset=elf_value(header+8,8,length),virtual=elf_value(header+16,8,length),file_size=elf_value(header+32,8,length),memory_size=elf_value(header+40,8,length),alignment=elf_value(header+48,8,length);
+        if(kind==3||kind==7){fault("dynamic interpreter/TLS not supported");return 0;}
+        if(kind==2){if(dynamic||virtual>RAM_SIZE-load_bias){fault("invalid/duplicate PT_DYNAMIC");return 0;}dynamic=virtual+load_bias;dynamic_size=file_size;continue;}
+        if(kind!=1)continue;
+        if(virtual>32u*1024u*1024u-load_bias){fault("ELF segment address overflow");return 0;}
+        uint64_t address=virtual+load_bias;
+        if(file_size>memory_size||offset>length||file_size>length-offset||address<4096||memory_size>32u*1024u*1024u-address){fault("invalid ELF load segment");return 0;}
+        if(alignment>1&&((alignment&(alignment-1))||((virtual-offset)&(alignment-1))||(load_bias&(alignment-1)))){fault("invalid ELF segment alignment");return 0;}
+        extents[extent_count++]=(LoadExtent){address,memory_size,(unsigned)flags};
         memcpy(guest_ram+address,elf_image+offset,(size_t)file_size);
         if(address+memory_size>heap_end)heap_end=address+memory_size;
-        if(offset<=phoff&&phoff-offset<memory_size)phdr=address+phoff-offset;
-        if((flags&1)&&guest_pc>=address&&guest_pc<address+memory_size)entry_valid=1;
+        if(offset<=phoff&&phoff-offset<=file_size&&phcount*phsize<=file_size-(phoff-offset))phdr=address+phoff-offset;
     }
-    if(!entry_valid||(guest_pc&3)||!phdr){fault("ELF entry/PHDR is not mapped");return 0;}
+    if(!mapped(guest_pc,4,1)||(guest_pc&3)||!phdr){fault("ELF entry/PHDR is not mapped");return 0;}
+    if(type==3&&!relocate_pie(dynamic,dynamic_size))return 0;
+    /* Fixed-address static executables can carry dynamic metadata, but may not
+       ask this loader for relocations: applying them twice would be incorrect. */
+    if(type==2&&dynamic){fault("ET_EXEC dynamic metadata not supported");return 0;}
     heap_end=align_page(heap_end);
     /* Linux entry stack: argc, argv[], NULL, envp NULL, auxv key/value pairs.
        AT_RANDOM is fixed demo data; it is not cryptographic entropy. */
@@ -277,12 +352,15 @@ static int boot_elf(unsigned length,int argc,const char *const *argv){
     store(stack,0,8);stack+=8;store(stack,0,8);stack+=8;for(unsigned index=0;index<sizeof aux/sizeof aux[0];index++,stack+=8)store(stack,aux[index],8);
     return state!=FAULTED;
 }
+static int boot_elf(unsigned length,int argc,const char *const *argv){return boot_elf_at(length,argc,argv,0);}
 
 /* Public WASM ABI: upload ELF, boot, enqueue stdin, run bounded CPU batches.
    Return state 0=running, 1=stdin wait, 2=process exit, 3=emulator fault. */
 unsigned rv_image_pointer(void){return (unsigned)(uintptr_t)elf_image;}
 unsigned rv_image_limit(void){return ELF_LIMIT;}
 unsigned rv_boot(unsigned length){const char *args[]={"trs80-rv64im","--interactive"};return boot_elf(length,2,args);}
+unsigned rv_boot_at(unsigned length,unsigned bias){const char *args[]={"trs80-rv64im","--interactive"};return boot_elf_at(length,2,args,bias);}
+unsigned rv_load_bias(void){return (unsigned)load_bias;}
 unsigned rv_enqueue(unsigned value){unsigned next=(key_write+1)%sizeof keyboard;if(next==key_read)return 0;keyboard[key_write]=(unsigned char)value;key_write=next;if(state==WAITING)state=RUNNING;return 1;}
 unsigned rv_run(unsigned budget){for(unsigned tick=0;tick<budget&&state==RUNNING;tick++)step();return state;}
 unsigned rv_steps(void){return (unsigned)instructions;}
@@ -292,10 +370,12 @@ unsigned rv_fault_pointer(void){return (unsigned)(uintptr_t)fault_message;}
 /* Native driver uses the same CPU/loader as WASM. Arguments after the ELF path
    become guest argv, enabling direct comparison with QEMU on the same ELF. */
 int main(int argc,char **argv){
-    if(argc<2){fprintf(stderr,"usage: rv-run PROGRAM.elf [GUEST ARGS...]\n");return 1;}
-    FILE *file=fopen(argv[1],"rb");if(!file){perror(argv[1]);return 1;}
+    uint64_t bias=0;int guest=1;
+    if(argc>3&&!strcmp(argv[1],"--base")){char *end;bias=strtoull(argv[2],&end,0);if(*end){fprintf(stderr,"invalid load base\n");return 1;}guest=3;}
+    if(argc<=guest){fprintf(stderr,"usage: rv-run [--base ADDRESS] PROGRAM.elf [GUEST ARGS...]\n");return 1;}
+    FILE *file=fopen(argv[guest],"rb");if(!file){perror(argv[guest]);return 1;}
     size_t length=fread(elf_image,1,sizeof elf_image,file);if(fgetc(file)!=EOF){fprintf(stderr,"ELF exceeds limit\n");return 1;}fclose(file);
-    if(!boot_elf((unsigned)length,argc-1,(const char *const *)(argv+1))){fprintf(stderr,"%s\n",fault_message);return 1;}
+    if(!boot_elf_at((unsigned)length,argc-guest,(const char *const *)(argv+guest),bias)){fprintf(stderr,"%s\n",fault_message);return 1;}
     uint64_t limit=UINT64_C(5000000000);
     while(state==RUNNING||state==WAITING){
         if(state==WAITING){int ch=getchar();if(ch==EOF){fprintf(stderr,"stdin EOF while guest waits\n");return 1;}rv_enqueue((unsigned)ch);}

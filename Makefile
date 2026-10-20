@@ -77,7 +77,7 @@ clean:
 
 # The browser target uses the same generated ROM C and a bounded execution ABI.
 WASM_CC ?= $(if $(ZIG),$(CURDIR)/$(ZIG) cc -target wasm32-wasi,zig cc -target wasm32-wasi)
-WASM_FLAGS ?= -O1 -Wl,--strip-all
+WASM_FLAGS ?= -O1 -mexec-model=reactor -Wl,--strip-all
 WASM_EXPORTS = web_reset web_enqueue web_run web_program_pointer web_program_length web_step_count web_upload_pointer web_upload
 .PHONY: wasm test-wasm serve
 web/trs-risc.wasm: src/web.c src/runtime.c build/translated.inc
@@ -98,21 +98,21 @@ test-browser: wasm
 # Actual RV64 guest running inside a second, independent WASM CPU emulator.
 RV_GUEST_CC ?= $(if $(ZIG),$(CURDIR)/$(ZIG) cc -target riscv64-linux-musl,zig cc -target riscv64-linux-musl)
 RV_GUEST_FLAGS = -mcpu=generic_rv64+m+a-c-d-f -mabi=lp64 -O1 -static
-RV_EXPORTS = rv_image_pointer rv_image_limit rv_boot rv_enqueue rv_run rv_steps rv_exit_status rv_fault_pointer rv_memory_pointer rv_memory_size rv_program_counter rv_register
+RV_EXPORTS = rv_boot_at rv_load_bias rv_image_pointer rv_image_limit rv_boot rv_enqueue rv_run rv_steps rv_exit_status rv_fault_pointer rv_memory_pointer rv_memory_size rv_program_counter rv_register
 .PHONY: riscv-wasm test-riscv-wasm
 build/trs80-rv64im: src/runtime.c build/translated.inc
 	$(RV_GUEST_CC) $(RV_GUEST_FLAGS) -Ibuild $< -o $@
 build/rv-run: src/rv/rv64.c
 	$(CC) -O2 $< -o $@
 web/rv64.wasm: src/rv/rv64.c
-	$(WASM_CC) -O2 -DRV_NO_MAIN -Wl,--strip-all $< -Wl,--no-entry $(foreach symbol,$(RV_EXPORTS),-Wl,--export=$(symbol)) -o $@
+	$(WASM_CC) -O2 -mexec-model=reactor -DRV_NO_MAIN -Wl,--strip-all $< -Wl,--no-entry $(foreach symbol,$(RV_EXPORTS),-Wl,--export=$(symbol)) -o $@
 web/trs80-rv64im.elf: build/trs80-rv64im
 	cp $< $@
 riscv-wasm: ensure-zig
-	$(MAKE) web/rv64.wasm web/trs80-rv64im.elf web/demo.bas
+	$(MAKE) web/rv64.wasm web/trs80-rv64im.elf web/trs80-pie.elf web/demo.bas
 serve: riscv-wasm
 test-riscv-wasm: riscv-wasm build/rv-run
-	node tests/riscv-wasm.mjs
+	QEMU="$(QEMU)" node tests/riscv-wasm.mjs
 
 .PHONY: ensure-zig test-rv-cpu
 ensure-zig:
@@ -122,3 +122,19 @@ build/rv-cpu-test: tests/rv_cpu.c src/rv/rv64.c
 test-rv-cpu: build/rv-cpu-test
 	build/rv-cpu-test
 test-riscv-wasm: test-rv-cpu
+
+# Static PIE relocation tests: the small fixture has no self-relocating CRT.
+.PHONY: test-elf-loader
+build/pie-guest: tests/pie_start.S tests/pie_guest.c
+	$(RV_GUEST_CC) -mcpu=generic_rv64+m+a-c-d-f -mabi=lp64 -fPIE -pie -nostdlib -Wl,--no-dynamic-linker -Wl,-e,_start -O1 $^ -o $@
+build/elf-loader-test: tests/elf_loader.c src/rv/rv64.c
+	$(CC) -O2 $< -o $@
+test-elf-loader: build/pie-guest build/elf-loader-test
+	build/elf-loader-test
+build/trs80-pie: src/runtime.c build/translated.inc
+	$(RV_GUEST_CC) -mcpu=generic_rv64+m+a-c-d-f -mabi=lp64 -fPIE -pie -static -O1 -Ibuild $< -o $@
+web/trs80-pie.elf: build/trs80-pie
+	cp $< $@
+riscv-wasm: test-elf-loader
+
+test-browser: riscv-wasm

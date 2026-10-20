@@ -1,5 +1,5 @@
 Build, dependencies and commands
-===============================
+================================
 
 Host prerequisites
 ------------------
@@ -86,7 +86,7 @@ The build runs Sphinx with ``-n -W --keep-going``: unresolved references and oth
 warnings fail the build. The size page is generated from the actual RV64 ELF.
 
 RISC-V-in-WASM target
---------------------
+---------------------
 
 .. code-block:: sh
 

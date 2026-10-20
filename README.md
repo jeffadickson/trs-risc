@@ -8,12 +8,14 @@ Repository: https://github.com/jeffadickson/trs-risc
 
 There are two browser execution paths:
 
-1. **Default:** Z80 ROM → C → actual RV64 Linux ELF → our RISC-V CPU → WASM → HTML.
+1. **Default:** Z80 ROM → C → relocatable RV64 Linux PIE → our RISC-V CPU → WASM → HTML.
 2. **Direct:** Z80 ROM → C → WASM → HTML, available as `?engine=direct`.
 
 The default path runs real RISC-V instructions. The emulator is 35 KB of stripped
 WASM and has a static ELF loader, bounded guest RAM and a small Linux syscall
-layer. RV64I, M, and single-hart A are implemented; C/F/D, privileged hardware,
+layer. Static PIE supports checked `R_RISCV_RELATIVE` relocations at a chosen
+base (`?base=0xc00000` tries 12 MB). This does not link `.o` files or shared
+libraries. RV64I, M, and single-hart A are implemented; C/F/D, privileged hardware,
 an MMU, threads, dynamic linking and general Linux compatibility are not.
 
 ```sh

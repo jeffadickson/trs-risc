@@ -1,7 +1,7 @@
 HTML and WebAssembly
 ====================
 
-Two paths are available. The default runs an actual RV64IMA Linux ELF in the
+Two paths are available. The default runs an actual relocatable RV64IMA Linux PIE in the
 new C RISC-V CPU compiled to WASM. The alternate ``?engine=direct`` path compiles
 the same translated BASIC C directly to wasm32-wasi. There is no JavaScript Z80
 emulator or separate BASIC implementation. See :doc:`riscv-emulator` for the CPU
@@ -62,3 +62,7 @@ adapter under Node. ``make test-browser`` additionally launches Chromium against
 the HTML UI. The optional browser test needs a Chromium executable and a sandbox
 that permits its local sockets. The test's file-access flag is for isolated local
 testing only, not required when normally serving over HTTP.
+
+The default PIE loads at 4 MB. Use ``?base=0xc00000`` to select a 12 MB load bias
+or ``?elf=exec`` for the fixed-address ELF. Program images remain identical across
+PIE bases. See :doc:`riscv-emulator` for relocation validation and limits.

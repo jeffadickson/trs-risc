@@ -21,6 +21,8 @@ Hidden WZ behavior, real interrupts and cycle timing are outside these tests.
    make test         # C CPU differential tests and C# behavioral tests
    make test-riscv   # native RV64 ELF behavior through QEMU
    make test-wasm    # compiled WASM through the exact browser host adapter
+   make test-elf-loader # static PIE relocations and malformed ELF tests
+   make test-riscv-wasm # full BASIC PIE at two bases, plus QEMU comparison
    make test-browser # optional real Chromium UI test
    make docs         # strict Sphinx warning/reference checks
 

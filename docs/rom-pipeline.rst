@@ -56,7 +56,7 @@ BASIC. Keeping 12 KB of data is a deliberate compatibility choice, not evidence
 of a hidden runtime opcode interpreter.
 
 The original reset instructions
-------------------------------
+-------------------------------
 
 .. code-block:: asm
 

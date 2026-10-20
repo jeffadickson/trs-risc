@@ -1,5 +1,5 @@
 Z80 versus native code size
-==========================
+===========================
 
 Run ``make size-report`` to measure the current RV64 ELF directly. ``make docs``
 does this automatically. The C# measurement utility reads ELF64 section headers
