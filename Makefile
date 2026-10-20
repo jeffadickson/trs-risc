@@ -126,7 +126,7 @@ test-riscv-wasm: test-rv-cpu
 # Static PIE relocation tests: the small fixture has no self-relocating CRT.
 .PHONY: test-elf-loader
 build/pie-guest: tests/pie_start.S tests/pie_guest.c
-	$(RV_GUEST_CC) -mcpu=generic_rv64+m+a-c-d-f -mabi=lp64 -fPIE -pie -nostdlib -Wl,--no-dynamic-linker -Wl,-e,_start -O1 $^ -o $@
+	$(RV_GUEST_CC) -mcpu=generic_rv64+m+a-c-d-f -mabi=lp64 -fPIE -pie -nostdlib -static -Wl,-e,_start -O1 $^ -o $@
 build/elf-loader-test: tests/elf_loader.c src/rv/rv64.c
 	$(CC) -O2 $< -o $@
 test-elf-loader: build/pie-guest build/elf-loader-test

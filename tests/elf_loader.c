@@ -41,6 +41,7 @@ int main(int argc,char **argv){
     restore();patch(rela_entry_tag+8,16,8);rejected(0x400000,"RELA table");
     restore();patch(rela_tag+8,RAM_SIZE,8);rejected(0x400000,"RELA table");
     restore();patch(dynamic_file,1,8);rejected(0x400000,"dependencies");
+    restore();patch(dynamic_file,7,8);patch(dynamic_file+8,0,8);rejected(0x400000,"duplicate DT_RELA");
     puts("PASS: invalid bias, symbol relocations, text/OOB/negative writes, malformed tables and DT_NEEDED rejected");
     /* Failed validation must not partially install earlier valid relocations. */
     restore();uint64_t first=elf_value(rela_file,8,file_length);patch(rela_file+24+8,2,8);
