@@ -97,11 +97,16 @@ test-browser: wasm
 
 # Actual RV64 guest running inside a second, independent WASM CPU emulator.
 RV_GUEST_CC ?= $(if $(ZIG),$(CURDIR)/$(ZIG) cc -target riscv64-linux-musl,zig cc -target riscv64-linux-musl)
-RV_GUEST_FLAGS = -mcpu=generic_rv64+m+a-c-d-f -mabi=lp64 -O1 -static
+RV_GUEST_FLAGS = -mcpu=generic_rv64+m+a-c-d-f -mabi=lp64 -O1 -g0 -static
+# LLVM/cross objcopy understands RV64 directly. Host GNU binutils can copy the
+# generic ELF64 representation; set EM_RISCV=243 explicitly (these guests use
+# e_flags=0). Keep the symbol table for browser BASIC-image memory lookup.
+RV_OBJCOPY ?= $(if $(shell command -v llvm-objcopy 2>/dev/null),llvm-objcopy,$(if $(shell command -v riscv64-linux-gnu-objcopy 2>/dev/null),riscv64-linux-gnu-objcopy,objcopy -I elf64-little -O elf64-little --alt-machine-code=243))
 RV_EXPORTS = rv_boot_at rv_load_bias rv_image_pointer rv_image_limit rv_boot rv_enqueue rv_run rv_steps rv_exit_status rv_fault_pointer rv_memory_pointer rv_memory_size rv_program_counter rv_register
 .PHONY: riscv-wasm test-riscv-wasm
-build/trs80-rv64im: src/runtime.c build/translated.inc
-	$(RV_GUEST_CC) $(RV_GUEST_FLAGS) -Ibuild $< -o $@
+build/trs80-rv64im: src/runtime.c build/translated.inc Makefile
+	$(RV_GUEST_CC) $(RV_GUEST_FLAGS) -Ibuild $< -o $@.full
+	$(RV_OBJCOPY) --strip-debug $@.full $@
 build/rv-run: src/rv/rv64.c
 	$(CC) -O2 $< -o $@
 web/rv64.wasm: src/rv/rv64.c
@@ -131,8 +136,9 @@ build/elf-loader-test: tests/elf_loader.c src/rv/rv64.c
 	$(CC) -O2 $< -o $@
 test-elf-loader: build/pie-guest build/elf-loader-test
 	build/elf-loader-test
-build/trs80-pie: src/runtime.c build/translated.inc
-	$(RV_GUEST_CC) -mcpu=generic_rv64+m+a-c-d-f -mabi=lp64 -fPIE -pie -static -O1 -Ibuild $< -o $@
+build/trs80-pie: src/runtime.c build/translated.inc Makefile
+	$(RV_GUEST_CC) -mcpu=generic_rv64+m+a-c-d-f -mabi=lp64 -fPIE -pie -static -O1 -g0 -Ibuild $< -o $@.full
+	$(RV_OBJCOPY) --strip-debug $@.full $@
 web/trs80-pie.elf: build/trs80-pie
 	cp $< $@
 riscv-wasm: test-elf-loader

@@ -5,7 +5,7 @@ Host prerequisites
 ------------------
 
 Use Linux x86-64 with a C compiler, Make, curl, tar, jq, sha512sum and Python 3
-with venv support. The C# utilities target **.NET 8** and use only framework
+with venv support, plus GNU or LLVM objcopy (binutils). The C# utilities target **.NET 8** and use only framework
 libraries: there are no NuGet package dependencies. Sphinx is the sole use of
 Python in the project; ``docs/conf.py`` is its configuration, not a build tool.
 
@@ -99,3 +99,8 @@ the ordinary hard-float glibc cross compiler is not assumed to have compatible
 multilibs. ``ensure-zig`` obtains it before recursive Make discovers the path.
 The C# server opens http://localhost:8080/; the default page uses the actual
 RV64 ELF inside the WASM CPU. Use ``?engine=direct`` for direct C-to-WASM.
+
+The RV64 browser guest targets keep an unstripped ``.full`` file in build/ and
+remove DWARF payload from the served ELF while preserving symbols. This keeps
+compiler-dependent debug size out of the emulator upload budget. The fixed-size
+Z80 ROM and all loadable BASIC code/data remain present.

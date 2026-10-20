@@ -30,6 +30,7 @@ jobs:
           make test-wasm
           make test-riscv-wasm
       - name: Sphinx manual and measured code sizes
+        if: always()
         run: make docs
       - name: Chromium HTML and WASM terminal
         run: CHROMIUM=google-chrome make test-browser
