@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Native32 BASIC experiment</title>
+<style>body{max-width:60rem;margin:2rem auto;padding:1rem;font:17px system-ui;background:#15202b;color:#edf5ff}a{color:#9cf}textarea,pre,input{box-sizing:border-box;width:100%;font:16px monospace;background:#09121b;color:#bfffc8;border:1px solid #718096;padding:1rem}pre{height:22rem;overflow:auto;white-space:pre-wrap}button{padding:.6rem;margin:.4rem 0}label{display:block}</style>
+<h1>Native32 BASIC</h1><p>A fresh functional interpreter: signed 32-bit INTEGER, IEEE SINGLE/DOUBLE, typed arrays and strings. This page executes C compiled directly to WebAssembly. The same core builds as real RV32 machine code; this page does not emulate that CPU.</p>
+<p><a href="index.html">Historical ROM / RV64 emulator</a> · <a href="https://github.com/jeffadickson/trs-risc">Source and build instructions</a></p>
+<label for="source">Numbered BASIC source</label><textarea id="source" rows="9">10 DEFINT I
+20 PRINT "HELLO FROM NATIVE32"
+30 DIM A%(65536)
+40 A%(65536)=2147483647
+50 PRINT A%(65536)
+60 FOR I=40000 TO 40002
+70 PRINT I;I*I
+80 NEXT I
+90 END</textarea>
+<button id="run">Load and run</button> <button id="reset">Reset</button>
+<pre id="output" aria-live="polite"></pre><form id="input"><label for="command">BASIC command or INPUT response</label><input id="command" autocomplete="off"><button>Send</button></form>
+<p>This is a subset. SIN, COS, TAN, ATN, EXP and LOG report UNSUPPORTED. Files, graphics, original token images and full Level II compatibility are not implemented. SQR uses a new Newton routine. Numeric formatting is experimental.</p>
+<script type="module" src="native32.mjs"></script></html>

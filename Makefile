@@ -163,3 +163,69 @@ test-et-rel: build/rel-guest.o build/rel-oracle build/et-rel-test build/rv-run
 test-et-rel-wasm: test-et-rel
 	$(MAKE) web/rv64.wasm
 	QEMU="$(QEMU)" node tests/et-rel.mjs wasm
+
+# Rebuilt functional interpreter: native32 numeric model, independent of the
+# historical ROM translator and its .NET/download pipeline.
+N32_CORE = $(filter-out src/native32/cli.c src/native32/web.c,$(wildcard src/native32/*.c))
+N32_WARN = -std=c11 -Wall -Wextra -Werror -Wno-misleading-indentation -ffp-contract=off
+.PHONY: native32 test-native32
+build/native32: $(N32_CORE) src/native32/cli.c src/native32/native.h
+	mkdir -p build
+	$(CC) $(N32_WARN) -Os -Isrc/native32 $(N32_CORE) src/native32/cli.c -o $@
+native32: build/native32
+build/native32-test: $(N32_CORE) tests/native32/test.c src/native32/native.h
+	mkdir -p build
+	$(CC) $(N32_WARN) -O2 -Isrc/native32 $(N32_CORE) tests/native32/test.c -o $@
+build/native32-sanitize: $(N32_CORE) tests/native32/test.c src/native32/native.h
+	mkdir -p build
+	$(CC) $(N32_WARN) -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc/native32 $(N32_CORE) tests/native32/test.c -o $@
+test-native32: native32 build/native32-test
+	build/native32-test
+
+N32_RV32_CC = $(CURDIR)/$(ZIG) cc -target riscv32-linux-musl
+N32_RV32_FLAGS = -mcpu=generic_rv32+m+a-c-d-f -mabi=ilp32 -Oz -static -ffunction-sections -fdata-sections -Wl,--gc-sections
+.PHONY: native32-rv32 test-native32-rv32 native32-wasm
+native32-rv32: ensure-zig
+	$(MAKE) build/native32-rv32 build/native32-test-rv32
+build/native32-rv32: $(N32_CORE) src/native32/cli.c src/native32/native.h
+	mkdir -p build
+	$(N32_RV32_CC) $(N32_WARN) $(N32_RV32_FLAGS) -Isrc/native32 $(N32_CORE) src/native32/cli.c -o $@
+build/native32-test-rv32: $(N32_CORE) tests/native32/test.c src/native32/native.h
+	mkdir -p build
+	$(N32_RV32_CC) $(N32_WARN) $(N32_RV32_FLAGS) -Isrc/native32 $(N32_CORE) tests/native32/test.c -o $@
+test-native32-rv32: native32-rv32
+	$(CURDIR)/.toolchain/qemu/usr/bin/qemu-riscv32 build/native32-test-rv32
+web/native32.wasm: $(N32_CORE) src/native32/web.c src/native32/native.h
+	$(WASM_CC) $(N32_WARN) -Oz -mexec-model=reactor -Wl,--strip-all -Isrc/native32 $(N32_CORE) src/native32/web.c -Wl,--no-entry -Wl,--export=n32_web_reset -Wl,--export=n32_web_enqueue -Wl,--export=n32_web_run -Wl,--export=n32_web_steps -o $@
+native32-wasm: ensure-zig
+	$(MAKE) web/native32.wasm
+
+N32_ROM_CC = $(CURDIR)/$(ZIG) cc -target riscv32-freestanding
+N32_BOARD = src/native32/board/start.S src/native32/board/runtime.c src/native32/board/uart.c
+N32_ROM_FLAGS = $(N32_WARN) -Oz -ffreestanding -fno-builtin -fno-strict-aliasing -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections -nostdlib -Isrc/native32/board/include -Isrc/native32 -Wl,--gc-sections -Wl,-T,src/native32/board/rom.ld
+.PHONY: native32-rom
+native32-rom: ensure-zig
+	$(MAKE) build/native32-rom.elf build/native32-rom-compact.elf
+build/native32-rom.elf: $(N32_CORE) $(N32_BOARD) src/native32/native.h src/native32/board/rom.ld
+	mkdir -p build
+	$(N32_ROM_CC) -mcpu=generic_rv32+m+a-c-d-f -mabi=ilp32 $(N32_ROM_FLAGS) $(N32_CORE) $(N32_BOARD) -o $@
+build/native32-rom-compact.elf: $(N32_CORE) $(N32_BOARD) src/native32/native.h src/native32/board/rom.ld
+	mkdir -p build
+	$(N32_ROM_CC) -mcpu=generic_rv32+m+a+c-d-f -mabi=ilp32 $(N32_ROM_FLAGS) -flto $(N32_CORE) $(N32_BOARD) -o $@
+
+.PHONY: test-native32-wasm
+test-native32-wasm: native32-wasm
+	node tests/native32/wasm.mjs
+
+.PHONY: native32-size docs-native32
+native32-size: native32-rom
+	mkdir -p docs/_generated
+	@size build/native32-rom.elf build/native32-rom-compact.elf
+	@{ echo 'Measured linked sections (bytes, text + initialized data; BSS excluded)::'; echo; size build/native32-rom.elf build/native32-rom-compact.elf | sed 's/^/   /'; } > docs/_generated/native32-size.rst
+docs-native32: native32-size ensure-docs
+	@test -f docs/_generated/size.rst || echo 'Historical translator size report not generated; run make size-report.' > docs/_generated/size.rst
+	$(SPHINX) -n -W --keep-going -b html docs build/docs/html
+
+.PHONY: serve-native32
+serve-native32: native32-wasm tools
+	$(TOOLS) serve web 8080

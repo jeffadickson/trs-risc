@@ -1,5 +1,27 @@
 # trs-risc — TRS-80 BASIC, RISC-V, and WebAssembly
 
+## Native RV32 rebuild (this branch)
+
+`src/native32` is a fresh functional BASIC subset with signed 32-bit INTEGER,
+IEEE SINGLE/DOUBLE, packed typed arrays and strings. The lost unpushed port was
+not recovered. The older ROM translator below remains a separate reference.
+
+```sh
+make test-native32                 # host core tests
+make test-native32-rv32            # actual RV32 under QEMU
+make test-native32-wasm            # browser core integration
+make native32-rom                 # freestanding baseline and compressed/LTO
+make docs-native32                # Sphinx documentation
+build/native32 console
+```
+
+Build `make native32-wasm`, serve `web` over HTTP, and open `/native32.html`.
+That page executes the functional C core directly in WASM; the old RV64 emulator
+is on `/index.html`. A new browser RV32 CPU is not yet implemented.
+See [numeric policy, implemented subset, missing features and sizes](docs/native32.rst).
+The original transcendental algorithms are not yet ported; SIN/COS/TAN/ATN/EXP/LOG
+explicitly report UNSUPPORTED. This is not yet a complete Level II replacement.
+
 The original **Model I Level II BASIC ROM**, translated ahead of time to native
 code, with a C program-image workbench and a newly written **RV64IMA emulator
 compiled to WebAssembly**.

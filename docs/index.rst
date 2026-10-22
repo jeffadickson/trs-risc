@@ -1,6 +1,9 @@
 trs-risc: Level II BASIC on RISC-V
 ==================================
 
+A new functional RV32 rebuild is described in :doc:`native32`. The historical
+reference path below remains available.
+
 This is a historical programming experiment: run the **original TRS-80 Model I
 Level II BASIC ROM** as ahead-of-time translated RV64 native code, then use that
 same ROM as a tokenizer, detokenizer and program runner.
@@ -16,6 +19,8 @@ Repository: https://github.com/jeffadickson/trs-risc
 .. toctree::
    :maxdepth: 2
 
+   native32
+   native32-handoff
    getting-started
    rom-pipeline
    architecture
