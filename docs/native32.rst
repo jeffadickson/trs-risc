@@ -53,13 +53,15 @@ Statement budgets and a WAIT result let INPUT suspend without replaying RUN.
 * Nonfinite results produce an overflow error; subnormal values are allowed.
   Decimal parsing and 9/17 significant digit printing are experimental, not
   guaranteed correctly rounded or exact round trips for every IEEE value.
-* SQR uses a new Newton iteration. RND uses xorshift32. These are deliberate
-  new algorithms, not claims of original Level II numeric output compatibility.
+* LOG, EXP, SQR, SIN, COS, TAN and ATN port the ROM algorithms in native
+  arithmetic; see :doc:`native32-math` for decoding, rounding and accuracy limits.
+  RND still uses the replacement xorshift32 algorithm.
 
 This embraces RV32 for values, indices and arithmetic rather than translating
 8-bit register operations. Soft-float still requires compiler support routines
 for floating arithmetic on the chosen RV32IMA processor. There is no hardware
-FPU profile yet. Integer-only power is supported; fractional exponents are not.
+FPU profile yet. Fractional power follows the ROM LOG/EXP algorithm; integral powers retain a
+native exponentiation-by-squaring fast path.
 
 Implemented subset and gaps
 ---------------------------
@@ -68,10 +70,9 @@ Implemented: numbered source editing, RUN/LIST/NEW/CLEAR, assignments, numeric
 and string expressions, comparisons and logical operators, PRINT, single-target
 INPUT, IF/THEN/ELSE, GOTO/GOSUB/RETURN, typed FOR/NEXT, DIM, typed declarations,
 DATA/READ/RESTORE, tracing, ABS/SGN/INT/FIX, conversions, LEN/ASC/CHR$, STR$/VAL,
-LEFT$/RIGHT$/MID$, SQR and RND.
+LEFT$/RIGHT$/MID$, LOG/EXP/SQR/SIN/COS/TAN/ATN, fractional powers and RND.
 
-Missing: SIN/COS/TAN/ATN/EXP/LOG (recognized and explicitly UNSUPPORTED), original
-math algorithms, fractional powers, nested IF, multi-variable NEXT and INPUT,
+Missing: original RND behavior, nested IF, multi-variable NEXT and INPUT,
 CONT, list ranges, PRINT zones/formatting compatibility, user-defined functions,
 string assignment forms such as MID$ statements, machine-memory and hardware
 functions, cassette/file operations, graphics, full error compatibility and

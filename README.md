@@ -19,8 +19,10 @@ Build `make native32-wasm`, serve `web` over HTTP, and open `/native32.html`.
 That page executes the functional C core directly in WASM; the old RV64 emulator
 is on `/index.html`. A new browser RV32 CPU is not yet implemented.
 See [numeric policy, implemented subset, missing features and sizes](docs/native32.rst).
-The original transcendental algorithms are not yet ported; SIN/COS/TAN/ATN/EXP/LOG
-explicitly report UNSUPPORTED. This is not yet a complete Level II replacement.
+LOG, EXP, SQR, SIN, COS, TAN and ATN now port the ROM algorithms using native
+IEEE arithmetic, with mixed Z80/C comments and direct ROM comparisons. See
+[the decoded math path](docs/native32-math.rst). IEEE rounding changes some
+results; this is not bit-exact MBF compatibility or a complete Level II replacement.
 
 The original **Model I Level II BASIC ROM**, translated ahead of time to native
 code, with a C program-image workbench and a newly written **RV64IMA emulator

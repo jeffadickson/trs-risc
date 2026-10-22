@@ -10,12 +10,12 @@ Use ``ASAN_OPTIONS=detect_leaks=0 build/native32-sanitize`` after building
 ``make build/native32-sanitize``; LeakSanitizer cannot run under this workspace's
 ptrace environment. AddressSanitizer and UndefinedBehaviorSanitizer remain active.
 
-Next priorities are original-math research and explicitly chosen native numeric
-requirements, transcendental implementations, fuller Level II syntax and error
-behavior, reliable IEEE decimal conversion, an RV32 browser CPU/loader and
+Next priorities are fuller Level II syntax and error behavior, expanded math
+validation and higher-accuracy DOUBLE coefficients, reliable IEEE decimal
+conversion, an RV32 browser CPU/loader and
 boot verification for the firmware contract. Do not silently substitute host
-libm and claim original output compatibility. Existing SQR and RND are new
-algorithms. Every added feature needs relevant native-width boundary cases.
+libm and claim original output compatibility. The math path is now decoded in :doc:`native32-math`; RND remains a new
+algorithm. Every added feature needs relevant native-width boundary cases.
 
 The 50 C checks were also built and run cumulatively at 10, 20, 30, 40 and 50
 checks using ``N32_CHECKPOINT=1`` through ``5``. This is validation grouping,

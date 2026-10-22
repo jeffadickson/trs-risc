@@ -25,6 +25,8 @@ double n32_real(const N32Value *value);
 int n32_to_integer(const N32Value *value,int32_t *result);
 int n32_convert(const N32Value *value,N32Type type,N32Value *result);
 int n32_binary(uint8_t op,const N32Value *left,const N32Value *right,N32Value *result);
+int n32_math(uint8_t token,const N32Value *input,N32Value *result);
+int n32_math_power(const N32Value *base,const N32Value *exponent,N32Value *result);
 int n32_unary(uint8_t op,const N32Value *value,N32Value *result);
 int n32_compare(const N32Value *left,const N32Value *right,int *order);
 int n32_parse_number(const uint8_t *text,size_t length,size_t *used,N32Value *result);

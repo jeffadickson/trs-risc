@@ -20,6 +20,7 @@ Repository: https://github.com/jeffadickson/trs-risc
    :maxdepth: 2
 
    native32
+   native32-math
    native32-handoff
    getting-started
    rom-pipeline

@@ -156,7 +156,7 @@ int n32_format(const N32Value *value,char *text,size_t capacity,size_t *length){
    if(scientific){out[n++]=(char)('0'+digits[0]);if(precision>1)out[n++]='.';for(unsigned i=1;i<precision;i++)out[n++]=(char)('0'+digits[i]);out[n++]=value->type==N32_DOUBLE?'D':'E';out[n++]=exponent<0?'-':'+';
     unsigned e=(unsigned)(exponent<0?-exponent:exponent);if(e>=100)out[n++]=(char)('0'+e/100);if(e>=10)out[n++]=(char)('0'+(e/10)%10);out[n++]=(char)('0'+e%10);
    }else{int point_at=exponent+1;if(point_at<=0){out[n++]='0';out[n++]='.';for(int i=0;i< -point_at;i++)out[n++]='0';}
-    for(unsigned i=0;i<precision;i++){if((int)i==point_at)out[n++]='.';out[n++]=(char)('0'+digits[i]);}
+    for(unsigned i=0;i<precision;i++){if(point_at>0&&(int)i==point_at)out[n++]='.';out[n++]=(char)('0'+digits[i]);}
     for(int i=(int)precision;i<point_at;i++)out[n++]='0';
    }
   }

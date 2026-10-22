@@ -48,18 +48,8 @@ static int function(Parser *p,uint8_t token,N32Value *result){
  if(token==T_STR){char text[48];size_t length;status=n32_format(v,text,sizeof text,&length);if(!status){uint8_t bytes[49];size_t pad=text[0]=='-'?0:1;if(pad)bytes[0]=' ';memcpy(bytes+pad,text,length);status=n32_string(bytes,length+pad,result);}goto done;}
  if(token==T_CINT||token==T_CSNG||token==T_CDBL){status=n32_convert(v,token==T_CINT?N32_INTEGER:token==T_CSNG?N32_SINGLE:N32_DOUBLE,result);goto done;}
  double real=n32_real(v);
- if(token==T_SQR){
-  if(real<0){status=N32_DOMAIN;goto done;}
-  if(real==0){*result=v->type==N32_DOUBLE?n32_double(0):n32_single(0);goto done;}
-  /* Native IEEE Newton iteration. This is intentionally a new implementation,
-   * not a claim to reproduce Level II's LOG/EXP square-root path. Scale tiny
-   * inputs first so the exponent seed also handles binary64 subnormals. */
-  double scaled=real,adjust=1;if(scaled<2.2250738585072014e-308){scaled*=18014398509481984.0;adjust=134217728.0;}
-  N32Value seed=n32_double(scaled);uint64_t bits=((uint64_t)seed.as.wide.high<<32)|seed.as.wide.low;
-  bits=(bits>>1)+UINT64_C(0x1ff8000000000000);seed.as.wide.low=(uint32_t)bits;seed.as.wide.high=(uint32_t)(bits>>32);double guess=n32_real(&seed);
-  for(unsigned i=0;i<8;i++)guess=0.5*(guess+scaled/guess);N32Value answer=n32_double(guess/adjust);
-  status=n32_convert(&answer,v->type==N32_DOUBLE?N32_DOUBLE:N32_SINGLE,result);
- }else if(token==T_ABS){if(real<0)status=n32_unary('-',v,result);else *result=*v;}
+ if(token>=T_SQR&&token<=T_LOG){status=n32_math(token,v,result);}
+ else if(token==T_ABS){if(real<0)status=n32_unary('-',v,result);else *result=*v;}
  else if(token==T_SGN)*result=n32_integer(real>0?1:real<0?-1:0);
  else if(token==T_INT||token==T_FIX){
   if(v->type==N32_INTEGER){*result=*v;goto done;}
@@ -93,7 +83,7 @@ static int primary(Parser *p,N32Value *result){
 }
 static unsigned precedence(uint8_t token){return token==T_OR?1:token==T_AND?2:token=='<'||token=='>'||token=='='?3:token=='+'||token=='-'?4:token=='*'||token=='/'?5:token=='^'||token=='['?7:0;}
 static int power(const N32Value *a,const N32Value *b,N32Value *result){
- int32_t exponent;int status=n32_to_integer(b,&exponent);if(status)return status;if(n32_real(b)!=exponent)return N32_UNSUPPORTED;
+ int32_t exponent;int status=n32_to_integer(b,&exponent);if(status==N32_OVERFLOW)return n32_math_power(a,b,result);if(status)return status;if(n32_real(b)!=exponent)return n32_math_power(a,b,result);
  bool negative=exponent<0;uint32_t bits=negative?0u-(uint32_t)exponent:(uint32_t)exponent;
  N32Value answer=n32_integer(1),factor=*a;
  while(bits){if(bits&1){status=n32_binary('*',&answer,&factor,&answer);if(status)return status;}bits>>=1;if(bits){status=n32_binary('*',&factor,&factor,&factor);if(status)return status;}}

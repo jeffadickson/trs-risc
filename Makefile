@@ -167,16 +167,17 @@ test-et-rel-wasm: test-et-rel
 # Rebuilt functional interpreter: native32 numeric model, independent of the
 # historical ROM translator and its .NET/download pipeline.
 N32_CORE = $(filter-out src/native32/cli.c src/native32/web.c,$(wildcard src/native32/*.c))
+N32_HEADERS = src/native32/native.h src/native32/math_kernel.inc
 N32_WARN = -std=c11 -Wall -Wextra -Werror -Wno-misleading-indentation -ffp-contract=off
 .PHONY: native32 test-native32
-build/native32: $(N32_CORE) src/native32/cli.c src/native32/native.h
+build/native32: $(N32_CORE) src/native32/cli.c $(N32_HEADERS)
 	mkdir -p build
 	$(CC) $(N32_WARN) -Os -Isrc/native32 $(N32_CORE) src/native32/cli.c -o $@
 native32: build/native32
-build/native32-test: $(N32_CORE) tests/native32/test.c src/native32/native.h
+build/native32-test: $(N32_CORE) tests/native32/test.c $(N32_HEADERS)
 	mkdir -p build
 	$(CC) $(N32_WARN) -O2 -Isrc/native32 $(N32_CORE) tests/native32/test.c -o $@
-build/native32-sanitize: $(N32_CORE) tests/native32/test.c src/native32/native.h
+build/native32-sanitize: $(N32_CORE) tests/native32/test.c $(N32_HEADERS)
 	mkdir -p build
 	$(CC) $(N32_WARN) -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc/native32 $(N32_CORE) tests/native32/test.c -o $@
 test-native32: native32 build/native32-test
@@ -187,15 +188,15 @@ N32_RV32_FLAGS = -mcpu=generic_rv32+m+a-c-d-f -mabi=ilp32 -Oz -static -ffunction
 .PHONY: native32-rv32 test-native32-rv32 native32-wasm
 native32-rv32: ensure-zig
 	$(MAKE) build/native32-rv32 build/native32-test-rv32
-build/native32-rv32: $(N32_CORE) src/native32/cli.c src/native32/native.h
+build/native32-rv32: $(N32_CORE) src/native32/cli.c $(N32_HEADERS)
 	mkdir -p build
 	$(N32_RV32_CC) $(N32_WARN) $(N32_RV32_FLAGS) -Isrc/native32 $(N32_CORE) src/native32/cli.c -o $@
-build/native32-test-rv32: $(N32_CORE) tests/native32/test.c src/native32/native.h
+build/native32-test-rv32: $(N32_CORE) tests/native32/test.c $(N32_HEADERS)
 	mkdir -p build
 	$(N32_RV32_CC) $(N32_WARN) $(N32_RV32_FLAGS) -Isrc/native32 $(N32_CORE) tests/native32/test.c -o $@
 test-native32-rv32: native32-rv32
 	$(CURDIR)/.toolchain/qemu/usr/bin/qemu-riscv32 build/native32-test-rv32
-web/native32.wasm: $(N32_CORE) src/native32/web.c src/native32/native.h
+web/native32.wasm: $(N32_CORE) src/native32/web.c $(N32_HEADERS)
 	$(WASM_CC) $(N32_WARN) -Oz -mexec-model=reactor -Wl,--strip-all -Isrc/native32 $(N32_CORE) src/native32/web.c -Wl,--no-entry -Wl,--export=n32_web_reset -Wl,--export=n32_web_enqueue -Wl,--export=n32_web_run -Wl,--export=n32_web_steps -o $@
 native32-wasm: ensure-zig
 	$(MAKE) web/native32.wasm
@@ -206,10 +207,10 @@ N32_ROM_FLAGS = $(N32_WARN) -Oz -ffreestanding -fno-builtin -fno-strict-aliasing
 .PHONY: native32-rom
 native32-rom: ensure-zig
 	$(MAKE) build/native32-rom.elf build/native32-rom-compact.elf
-build/native32-rom.elf: $(N32_CORE) $(N32_BOARD) src/native32/native.h src/native32/board/rom.ld
+build/native32-rom.elf: $(N32_CORE) $(N32_BOARD) $(N32_HEADERS) src/native32/board/rom.ld
 	mkdir -p build
 	$(N32_ROM_CC) -mcpu=generic_rv32+m+a-c-d-f -mabi=ilp32 $(N32_ROM_FLAGS) $(N32_CORE) $(N32_BOARD) -o $@
-build/native32-rom-compact.elf: $(N32_CORE) $(N32_BOARD) src/native32/native.h src/native32/board/rom.ld
+build/native32-rom-compact.elf: $(N32_CORE) $(N32_BOARD) $(N32_HEADERS) src/native32/board/rom.ld
 	mkdir -p build
 	$(N32_ROM_CC) -mcpu=generic_rv32+m+a+c-d-f -mabi=ilp32 $(N32_ROM_FLAGS) -flto $(N32_CORE) $(N32_BOARD) -o $@
 
@@ -229,3 +230,27 @@ docs-native32: native32-size ensure-docs
 .PHONY: serve-native32
 serve-native32: native32-wasm tools
 	$(TOOLS) serve web 8080
+
+# The Z80 reference is test-only; it never enters the native firmware.
+.PHONY: test-native32-math test-native32-math-rom
+test-native32-math: build/native32-math-test
+	build/native32-math-test
+build/native32-math-test: $(N32_CORE) tests/native32/math.c $(N32_HEADERS)
+	mkdir -p build
+	$(CC) $(N32_WARN) -O2 -Isrc/native32 $(N32_CORE) tests/native32/math.c -o $@
+build/native32-rom-math.o: tests/native32/rom_math.c src/runtime.c build/translated.inc
+	$(CC) -O1 -Ibuild -c $< -o $@
+build/native32-math-rom-test: $(N32_CORE) tests/native32/math.c $(N32_HEADERS) build/native32-rom-math.o
+	$(CC) $(N32_WARN) -O2 -DROM_ORACLE -Isrc/native32 $(N32_CORE) tests/native32/math.c build/native32-rom-math.o -lm -o $@
+test-native32-math-rom: build/native32-math-rom-test
+	build/native32-math-rom-test
+
+build/native32-math-test-rv32: $(N32_CORE) tests/native32/math.c $(N32_HEADERS)
+	mkdir -p build
+	$(N32_RV32_CC) $(N32_WARN) $(N32_RV32_FLAGS) -Isrc/native32 $(N32_CORE) tests/native32/math.c -o $@
+.PHONY: test-native32-math-rv32
+test-native32-math-rv32: ensure-zig
+	$(MAKE) build/native32-math-test-rv32
+	$(CURDIR)/.toolchain/qemu/usr/bin/qemu-riscv32 build/native32-math-test-rv32
+build/native32-math-sanitize: $(N32_CORE) tests/native32/math.c $(N32_HEADERS)
+	$(CC) $(N32_WARN) -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc/native32 $(N32_CORE) tests/native32/math.c -o $@

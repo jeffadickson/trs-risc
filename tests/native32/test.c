@@ -71,7 +71,7 @@ int main(void){n32_init(&machine,write_bytes,read_line,&out);
  TEST(42,"IEEE subnormal SINGLE survives",N32Value v=eval("1E-40");CHECK(v.type==N32_SINGLE&&v.as.single>0&&v.as.single<1.17549435e-38f));
  TEST(43,"large INT retains floating storage",N32Value v=eval("INT(1D20)");CHECK(v.type==N32_DOUBLE&&n32_real(&v)==1e20));
  TEST(44,"unsigned-looking integer overflow is checked",CHECK(failed("CINT(4294967295#)")==N32_OVERFLOW));
- TEST(45,"legacy transcendental gaps are explicit",CHECK(failed("SIN(0)")==N32_UNSUPPORTED));
+ TEST(45,"ported sine handles zero",value("SIN(0)",0,N32_SINGLE));
  TEST(46,"integer format avoids signed minimum overflow",char text[48];size_t length;N32Value v=n32_integer(INT32_MIN);CHECK(n32_format(&v,text,sizeof text,&length)==N32_OK&&!strcmp(text,"-2147483648")));
  TEST(47,"promoted integer prints exactly",char text[48];size_t length;N32Value v=n32_double(2147483648.0);CHECK(n32_format(&v,text,sizeof text,&length)==N32_OK&&!strcmp(text,"2147483648")));
  TEST(48,"NEW frees arrays and typed state",CHECK(n32_command(&machine,"NEW")==N32_OK);CHECK(machine.program.count==0&&machine.variables==NULL));
