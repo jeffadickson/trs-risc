@@ -17,12 +17,20 @@ build/native32 console
 
 Build `make native32-wasm`, serve `web` over HTTP, and open `/native32.html`.
 That page executes the functional C core directly in WASM; the old RV64 emulator
-is on `/index.html`. A new browser RV32 CPU is not yet implemented.
+is on `/index.html`. The actual RV32 ROM simulator is on `/rv32-demo.html`: run
+`make serve-native32-simulator`. Run `make native32-demo` for a self-contained
+`build/native32-simulator.html` and an HTML math comparison page.
 See [numeric policy, implemented subset, missing features and sizes](docs/native32.rst).
 LOG, EXP, SQR, SIN, COS, TAN and ATN now port the ROM algorithms using native
 IEEE arithmetic, with mixed Z80/C comments and direct ROM comparisons. See
 [the decoded math path](docs/native32-math.rst). IEEE rounding changes some
 results; this is not bit-exact MBF compatibility or a complete Level II replacement.
+DOUBLE EXP now has split high/low ln(2) reduction and an 18-coefficient polynomial:
+4,725 independently generated high-precision cases showed at most two ULPs of
+error on host and RV32. Other DOUBLE math still has ROM coefficient limitations.
+RV32 uses [custom ROM-style integer floating arithmetic](docs/native32-wordfloat.rst),
+replacing generic compiler float helpers. The compact/LTO image is 31,638 bytes;
+the original ROM is 12,288 bytes, and the rebuild still implements fewer features.
 
 The original **Model I Level II BASIC ROM**, translated ahead of time to native
 code, with a C program-image workbench and a newly written **RV64IMA emulator

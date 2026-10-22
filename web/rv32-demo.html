@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Level II / RV32 — real ROM simulator</title>
+<style>:root{color-scheme:dark}body{max-width:1160px;margin:0 auto;padding:28px;font:16px system-ui;background:#10191f;color:#e8eee9}h1{font-size:34px;margin-bottom:8px}p{line-height:1.5;color:#bdcac5}a{color:#9de3b5}.tag{display:inline-block;background:#23362e;padding:6px 10px;border-radius:5px;margin:4px 4px 4px 0;font-size:14px}.grid{display:grid;grid-template-columns:1fr 1.1fr;gap:20px;margin-top:24px}textarea,pre,input,select{box-sizing:border-box;width:100%;background:#07120c;color:#bdffc9;border:1px solid #4a6555;border-radius:6px;padding:14px;font:15px/1.5 monospace}textarea{height:340px}pre{height:390px;overflow:auto;white-space:pre-wrap;margin-top:8px}button{background:#bcf0cb;color:#102819;border:0;border-radius:5px;padding:11px 16px;font-weight:650;cursor:pointer;margin:10px 8px 10px 0}button.secondary{background:#273d31;color:#e8eee9}label{display:block;font-weight:600;margin:12px 0 6px}#status{font:13px monospace;color:#9fb5a7;min-height:2em}.size{border-left:3px solid #a5ddba;padding-left:14px}small{color:#9fb5a7}form{display:flex;gap:8px}form input{flex:1}form button{margin:0}@media(max-width:750px){.grid{grid-template-columns:1fr}body{padding:18px}}</style>
+<h1>Level II, rebuilt for RV32</h1><p>The actual freestanding RISC-V ROM runs inside a CPU simulator compiled to WebAssembly. Floating-point arithmetic runs as our integer instructions in the guest. No F/D hardware instructions and no direct BASIC-to-WASM shortcut.</p>
+<div><span class="tag">Real RV32 instructions</span><span class="tag">Custom word floating point</span><span class="tag">16550 UART console</span></div>
+<p class="size" id="sizes">Loading ROM size comparison…</p>
+<div class="grid"><section><label for="profile">ROM image</label><select id="profile"><option value="compact">RV32IMAC + LTO · smaller image</option><option value="baseline">RV32IMA · baseline</option></select><label for="source">BASIC program</label><textarea id="source" spellcheck="false">10 PRINT "HELLO FROM THE RV32 ROM"
+20 DEFINT I
+30 FOR I=40000 TO 40002
+40 PRINT I;I*I
+50 NEXT I
+60 PRINT "DOUBLE EXP(1):";EXP(1#)
+70 PRINT "ROM-STYLE SQR(2):";SQR(2)
+80 PRINT "STRINGS: ";MID$("HELLO RV32",7,4)
+90 END</textarea><button id="run" disabled>Reset, load & run</button><button id="pause" class="secondary" disabled>Pause CPU</button><p id="status" role="status">Loading simulator…</p></section>
+<section><label for="output">Live UART output</label><pre id="output" aria-live="polite"></pre><form id="input"><input id="command" aria-label="BASIC command or INPUT response" placeholder="Try PRINT EXP(1#)" autocomplete="off"><button id="send" disabled>Send</button></form></section></div>
+<p><a href="math-comparison.html">Explore Z80 → RV32 floating-point algorithms and polynomial accuracy</a> · <a href="native32.html">Direct C/WASM reference</a> · <a href="https://github.com/jeffadickson/trs-risc/tree/native-rv32-rebuild">Source branch</a></p><small>This interpreter remains a Level II subset. DOUBLE EXP is refined; LOG and other inherited polynomials still limit the accuracy of SQR, power and trigonometry. The ROM size excludes ELF metadata and RAM.</small>
+<script type="module" src="rv32-demo.mjs"></script></html>

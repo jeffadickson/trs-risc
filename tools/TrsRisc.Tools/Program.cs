@@ -11,6 +11,8 @@ public static class Program
             if (args.Length == 0) throw new ArgumentException("commands: translate, fetch-rom, fixtures, demo, smoke, basic-smoke, size-report, serve");
             switch (args[0])
             {
+                case "browser-bundle" when args.Length == 2: BrowserBundle.Generate(args[1]); break;
+                case "exp-accuracy" when args.Length == 3: ExpAccuracy.Generate(args[1], args[2]); break;
                 case "translate" when args.Length == 3: Translator.TranslateFile(args[1], args[2]); break;
                 case "fetch-rom" when args.Length == 2: BuildTools.FetchRom(args[1]); break;
                 case "fixtures" when args.Length == 2: BuildTools.Fixtures(args[1]); break;

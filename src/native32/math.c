@@ -1,8 +1,8 @@
 /* Functional port of the pinned Model I Level II ROM's transcendental path.
  * This is ordinary arithmetic on native IEEE values, not a Z80 state machine.
- * Coefficients are exact conversions of ROM MBF SINGLE constants, so changing
- * register width does not silently replace Microsoft's approximation with libm.
- * The ROM's polynomial degree limits accuracy even for our DOUBLE entry points.
+ * SINGLE coefficients retain exact ROM MBF constants. DOUBLE EXP refines the
+ * same reduction/polynomial/scaling structure with split ln(2) and a degree-17
+ * polynomial; other DOUBLE kernels still have ROM approximation accuracy.
  * See math_kernel.inc for mixed Z80/algorithm comments at each function. */
 #include "native.h"
 #include <string.h>
@@ -39,6 +39,7 @@ static double fraction_double(double value,int *exponent){
 #undef REAL
 #undef NAME
 #undef FRACTION
+#define N32_DOUBLE_KERNEL
 #define REAL double
 #define NAME(x) double_##x
 #define FRACTION fraction_double
@@ -46,6 +47,7 @@ static double fraction_double(double value,int *exponent){
 #undef REAL
 #undef NAME
 #undef FRACTION
+#undef N32_DOUBLE_KERNEL
 
 int n32_math(uint8_t token,const N32Value *input,N32Value *result){
  if(input->type==N32_STRING)return N32_TYPE;

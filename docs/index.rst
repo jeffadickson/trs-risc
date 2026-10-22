@@ -21,6 +21,7 @@ Repository: https://github.com/jeffadickson/trs-risc
 
    native32
    native32-math
+   native32-wordfloat
    native32-handoff
    getting-started
    rom-pipeline

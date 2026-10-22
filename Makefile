@@ -31,7 +31,7 @@ ensure-riscv:
 $(TOOLS_DLL): $(wildcard tools/TrsRisc.Tools/*.cs) tools/TrsRisc.Tools/TrsRisc.Tools.csproj NuGet.Config | ensure-dotnet
 	$(DOTNET) build tools/TrsRisc.Tools -c Release -o $(CURDIR)/build/tools --nologo
 tools: $(TOOLS_DLL)
-$(ROM): $(TOOLS_DLL)
+$(ROM): | $(TOOLS_DLL)
 	$(TOOLS) fetch-rom $@
 fetch-rom: $(TOOLS_DLL)
 	$(TOOLS) fetch-rom $(ROM)
@@ -167,7 +167,7 @@ test-et-rel-wasm: test-et-rel
 # Rebuilt functional interpreter: native32 numeric model, independent of the
 # historical ROM translator and its .NET/download pipeline.
 N32_CORE = $(filter-out src/native32/cli.c src/native32/web.c,$(wildcard src/native32/*.c))
-N32_HEADERS = src/native32/native.h src/native32/math_kernel.inc
+N32_HEADERS = src/native32/native.h src/native32/math_kernel.inc src/native32/exp_coefficients.inc src/native32/exp_double.inc
 N32_WARN = -std=c11 -Wall -Wextra -Werror -Wno-misleading-indentation -ffp-contract=off
 .PHONY: native32 test-native32
 build/native32: $(N32_CORE) src/native32/cli.c $(N32_HEADERS)
@@ -184,16 +184,18 @@ test-native32: native32 build/native32-test
 	build/native32-test
 
 N32_RV32_CC = $(CURDIR)/$(ZIG) cc -target riscv32-linux-musl
+N32_WORDFLOAT = src/native32/wordfloat/wordfloat.c src/native32/wordfloat/abi.c
+N32_WF_HEADER = src/native32/wordfloat/wordfloat.h
 N32_RV32_FLAGS = -mcpu=generic_rv32+m+a-c-d-f -mabi=ilp32 -Oz -static -ffunction-sections -fdata-sections -Wl,--gc-sections
 .PHONY: native32-rv32 test-native32-rv32 native32-wasm
 native32-rv32: ensure-zig
 	$(MAKE) build/native32-rv32 build/native32-test-rv32
-build/native32-rv32: $(N32_CORE) src/native32/cli.c $(N32_HEADERS)
+build/native32-rv32: $(N32_CORE) src/native32/cli.c $(N32_HEADERS) $(N32_WORDFLOAT) $(N32_WF_HEADER)
 	mkdir -p build
-	$(N32_RV32_CC) $(N32_WARN) $(N32_RV32_FLAGS) -Isrc/native32 $(N32_CORE) src/native32/cli.c -o $@
-build/native32-test-rv32: $(N32_CORE) tests/native32/test.c $(N32_HEADERS)
+	$(N32_RV32_CC) $(N32_WARN) $(N32_RV32_FLAGS) -Isrc/native32 $(N32_WORDFLOAT) $(N32_CORE) src/native32/cli.c -o $@
+build/native32-test-rv32: $(N32_CORE) tests/native32/test.c $(N32_HEADERS) $(N32_WORDFLOAT) $(N32_WF_HEADER)
 	mkdir -p build
-	$(N32_RV32_CC) $(N32_WARN) $(N32_RV32_FLAGS) -Isrc/native32 $(N32_CORE) tests/native32/test.c -o $@
+	$(N32_RV32_CC) $(N32_WARN) $(N32_RV32_FLAGS) -Isrc/native32 $(N32_WORDFLOAT) $(N32_CORE) tests/native32/test.c -o $@
 test-native32-rv32: native32-rv32
 	$(CURDIR)/.toolchain/qemu/usr/bin/qemu-riscv32 build/native32-test-rv32
 web/native32.wasm: $(N32_CORE) src/native32/web.c $(N32_HEADERS)
@@ -207,12 +209,12 @@ N32_ROM_FLAGS = $(N32_WARN) -Oz -ffreestanding -fno-builtin -fno-strict-aliasing
 .PHONY: native32-rom
 native32-rom: ensure-zig
 	$(MAKE) build/native32-rom.elf build/native32-rom-compact.elf
-build/native32-rom.elf: $(N32_CORE) $(N32_BOARD) $(N32_HEADERS) src/native32/board/rom.ld
+build/native32-rom.elf: $(N32_CORE) $(N32_BOARD) $(N32_HEADERS) $(N32_WORDFLOAT) $(N32_WF_HEADER) src/native32/board/rom.ld
 	mkdir -p build
-	$(N32_ROM_CC) -mcpu=generic_rv32+m+a-c-d-f -mabi=ilp32 $(N32_ROM_FLAGS) $(N32_CORE) $(N32_BOARD) -o $@
-build/native32-rom-compact.elf: $(N32_CORE) $(N32_BOARD) $(N32_HEADERS) src/native32/board/rom.ld
+	$(N32_ROM_CC) -mcpu=generic_rv32+m+a-c-d-f -mabi=ilp32 $(N32_ROM_FLAGS) -g $(N32_WORDFLOAT) $(N32_CORE) $(N32_BOARD) -o $@
+build/native32-rom-compact.elf: $(N32_CORE) $(N32_BOARD) $(N32_HEADERS) $(N32_WORDFLOAT) $(N32_WF_HEADER) src/native32/board/rom.ld
 	mkdir -p build
-	$(N32_ROM_CC) -mcpu=generic_rv32+m+a+c-d-f -mabi=ilp32 $(N32_ROM_FLAGS) -flto $(N32_CORE) $(N32_BOARD) -o $@
+	$(N32_ROM_CC) -mcpu=generic_rv32+m+a+c-d-f -mabi=ilp32 $(N32_ROM_FLAGS) -flto -g $(N32_WORDFLOAT) $(N32_CORE) $(N32_BOARD) -o $@
 
 .PHONY: test-native32-wasm
 test-native32-wasm: native32-wasm
@@ -245,12 +247,56 @@ build/native32-math-rom-test: $(N32_CORE) tests/native32/math.c $(N32_HEADERS) b
 test-native32-math-rom: build/native32-math-rom-test
 	build/native32-math-rom-test
 
-build/native32-math-test-rv32: $(N32_CORE) tests/native32/math.c $(N32_HEADERS)
+build/native32-math-test-rv32: $(N32_CORE) tests/native32/math.c $(N32_HEADERS) $(N32_WORDFLOAT) $(N32_WF_HEADER)
 	mkdir -p build
-	$(N32_RV32_CC) $(N32_WARN) $(N32_RV32_FLAGS) -Isrc/native32 $(N32_CORE) tests/native32/math.c -o $@
+	$(N32_RV32_CC) $(N32_WARN) $(N32_RV32_FLAGS) -Isrc/native32 $(N32_WORDFLOAT) $(N32_CORE) tests/native32/math.c -o $@
 .PHONY: test-native32-math-rv32
 test-native32-math-rv32: ensure-zig
 	$(MAKE) build/native32-math-test-rv32
 	$(CURDIR)/.toolchain/qemu/usr/bin/qemu-riscv32 build/native32-math-test-rv32
 build/native32-math-sanitize: $(N32_CORE) tests/native32/math.c $(N32_HEADERS)
 	$(CC) $(N32_WARN) -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc/native32 $(N32_CORE) tests/native32/math.c -o $@
+
+.PHONY: regenerate-native32-exp test-native32-exp test-native32-exp-rv32
+regenerate-native32-exp: tools
+	$(TOOLS) exp-accuracy src/native32/exp_coefficients.inc tests/native32/exp_vectors.inc
+build/native32-exp-test: $(N32_CORE) $(N32_HEADERS) tests/native32/exp_accuracy.c tests/native32/exp_vectors.inc
+	mkdir -p build
+	$(CC) $(N32_WARN) -O2 -Isrc/native32 $(N32_CORE) tests/native32/exp_accuracy.c -o $@
+test-native32-exp: build/native32-exp-test
+	build/native32-exp-test
+build/native32-exp-test-rv32: $(N32_CORE) $(N32_HEADERS) tests/native32/exp_accuracy.c tests/native32/exp_vectors.inc $(N32_WORDFLOAT) $(N32_WF_HEADER)
+	mkdir -p build
+	$(N32_RV32_CC) $(N32_WARN) $(N32_RV32_FLAGS) -Isrc/native32 $(N32_WORDFLOAT) $(N32_CORE) tests/native32/exp_accuracy.c -o $@
+test-native32-exp-rv32: ensure-zig
+	$(MAKE) build/native32-exp-test-rv32
+	$(CURDIR)/.toolchain/qemu/usr/bin/qemu-riscv32 build/native32-exp-test-rv32
+
+.PHONY: test-native32-wordfloat
+test-native32-wordfloat: build/native32-wordfloat-test
+	build/native32-wordfloat-test
+build/native32-wordfloat-test: src/native32/wordfloat/wordfloat.c $(N32_WF_HEADER) tests/native32/wordfloat.c
+	mkdir -p build
+	$(CC) $(N32_WARN) -O2 -Isrc/native32 src/native32/wordfloat/wordfloat.c tests/native32/wordfloat.c -o $@
+
+build/native32-wordfloat-sanitize: src/native32/wordfloat/wordfloat.c $(N32_WF_HEADER) tests/native32/wordfloat.c
+	$(CC) $(N32_WARN) -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc/native32 src/native32/wordfloat/wordfloat.c tests/native32/wordfloat.c -o $@
+
+# Browser board simulator executes real RV32 ROM instructions with UART I/O.
+.PHONY: native32-simulator test-native32-simulator
+web/rv32-board.wasm: src/rv32/rv32.c
+	$(WASM_CC) $(N32_WARN) -Oz -mexec-model=reactor -Wl,--strip-all $< -Wl,--no-entry $(foreach symbol,rv32_image rv32_capacity rv32_load rv32_enqueue rv32_run rv32_cycles rv32_pc rv32_instruction rv32_pending,-Wl,--export=$(symbol)) -o $@
+web/native32-rom.elf: build/native32-rom.elf
+	objcopy -I elf32-little --alt-machine-code=243 --strip-all $< $@
+web/native32-rom-compact.elf: build/native32-rom-compact.elf
+	objcopy -I elf32-little --alt-machine-code=243 --strip-all $< $@
+native32-simulator: native32-rom
+	$(MAKE) web/rv32-board.wasm web/native32-rom.elf web/native32-rom-compact.elf
+test-native32-simulator: native32-simulator
+	node tests/native32/simulator.mjs
+
+.PHONY: native32-demo serve-native32-simulator
+native32-demo: native32-simulator tools
+	$(TOOLS) browser-bundle build/native32-simulator.html
+serve-native32-simulator: native32-simulator tools
+	$(TOOLS) serve web 8080

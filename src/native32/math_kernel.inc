@@ -41,6 +41,10 @@ static REAL NAME(logarithm)(REAL x){
  * LD HL,1479; CALL 14A9 approximates exp(-r); multiply by 2^(n+1).
  * Native scaling handles the larger IEEE exponent ranges, including subnormals.
  */
+#ifdef N32_DOUBLE_KERNEL
+#include "exp_coefficients.inc"
+#include "exp_double.inc"
+#else
 static REAL NAME(exponential)(REAL x){
  static const REAL coefficients[]={
   (REAL)-0x1.285c8p-13,(REAL)0x1.5c9eep-10,(REAL)-0x1.1004dcp-7,(REAL)0x1.5541ccp-5,
@@ -56,6 +60,7 @@ static REAL NAME(exponential)(REAL x){
  while(scale>0){answer=answer*(REAL)2;scale--;}
  while(scale<0){answer=answer*(REAL)0.5;scale++;}return answer;
 }
+#endif
 /* ROM 1547..1588 SIN:
  * divide by 2*pi; save fraction minus floor; form .25 minus fraction;
  * if negative add .5; negate when positive; add .25; restore initial sign;

@@ -25,7 +25,9 @@ The native host build needs a C compiler; WASM tests need Node. Open
 ``web/native32.html`` through a static HTTP server rooted at ``web`` after
 building WASM. The existing C# server is available with ``make serve-native32``. The page is a direct C-to-WASM implementation, not an RV32 emulator.
 Actual RV32 instructions are exercised under QEMU by the RV32 test target.
-The existing RV64 simulator cannot execute the new RV32 image.
+The separate ``rv32-demo.html`` simulator executes the actual RV32 firmware.
+Build it with ``make native32-simulator`` or generate an offline HTML bundle
+with ``make native32-demo``. It supports baseline and compressed ROM images.
 
 Architecture and numeric contract
 ---------------------------------
@@ -58,9 +60,9 @@ Statement budgets and a WAIT result let INPUT suspend without replaying RUN.
   RND still uses the replacement xorshift32 algorithm.
 
 This embraces RV32 for values, indices and arithmetic rather than translating
-8-bit register operations. Soft-float still requires compiler support routines
-for floating arithmetic on the chosen RV32IMA processor. There is no hardware
-FPU profile yet. Fractional power follows the ROM LOG/EXP algorithm; integral powers retain a
+8-bit register operations. RV32IMA uses our own ROM-style integer floating arithmetic, described in
+:doc:`native32-wordfloat`, rather than generic compiler float helpers. There is
+no hardware FPU profile yet. Fractional power follows the ROM LOG/EXP algorithm; integral powers retain a
 native exponentiation-by-squaring fast path.
 
 Implemented subset and gaps
@@ -128,4 +130,5 @@ counters, transactional loading and cooperative INPUT. These are requirements
 for this implementation, not a claim of 50 recovered Level II routines.
 Host, real RV32-under-QEMU and direct WASM share the core. The WASM integration
 test runs an array at index 65536, a wide loop and suspended INPUT, and rejects
-an oversized editor line. Firmware targets are link checked only.
+an oversized editor line. Both firmware profiles also boot in the WASM RV32 board simulator; physical
+hardware boot is not yet verified.
