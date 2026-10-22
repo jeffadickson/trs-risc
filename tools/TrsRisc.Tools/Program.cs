@@ -17,6 +17,7 @@ public static class Program
                 case "fetch-rom" when args.Length == 2: BuildTools.FetchRom(args[1]); break;
                 case "fixtures" when args.Length == 2: BuildTools.Fixtures(args[1]); break;
                 case "serve" when args.Length == 3: Server.Run(args[1], int.Parse(args[2])); break;
+                case "serve" when args.Length == 4: Server.Run(args[1], int.Parse(args[2]), args[3]); break;
                 case "demo": return Demo.Run(args[1..]);
                 case "smoke": Verification.Smoke(args[1..]); break;
                 case "basic-smoke": Verification.BasicSmoke(args[1..]); break;

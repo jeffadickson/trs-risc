@@ -21,9 +21,9 @@ function reset(run){profile=document.querySelector('#profile').value;const bytes
 try{const wasm=await asset('rv32-board.wasm');images={baseline:await asset('native32-rom.elf'),compact:await asset('native32-rom-compact.elf')};
  const {instance}=await WebAssembly.instantiate(wasm,{env:{uart_write:byte=>{if(byte!==13)text+=String.fromCharCode(byte);if(text.length>150000)text=text.slice(-120000);}}});cpu=instance.exports;cpu._initialize?.();
  for(const id of ['run','pause','send'])document.querySelector('#'+id).disabled=false;
- document.querySelector('#run').onclick=()=>{try{reset(true);}catch(error){status.textContent=String(error);}};
+ document.querySelector('#run').onclick=()=>{try{reset(true);}catch(error){status.textContent=String(error);status.textContent+=' — Run make serve-native32-simulator and open http://localhost:8080/. For offline use, open build/native32-simulator.html made by make native32-demo.';}};
  document.querySelector('#profile').onchange=()=>reset(true);
  document.querySelector('#pause').onclick=()=>{if(active){active=false;document.querySelector('#pause').textContent='Resume CPU';}else wake();};
- document.querySelector('#input').onsubmit=event=>{event.preventDefault();const input=document.querySelector('#command');try{send(input.value+'\n');input.value='';}catch(error){status.textContent=String(error);}};
+ document.querySelector('#input').onsubmit=event=>{event.preventDefault();const input=document.querySelector('#command');try{send(input.value+'\n');input.value='';}catch(error){status.textContent=String(error);status.textContent+=' — Run make serve-native32-simulator and open http://localhost:8080/. For offline use, open build/native32-simulator.html made by make native32-demo.';}};
  reset(true);
-}catch(error){status.textContent=String(error);}
+}catch(error){status.textContent=String(error);status.textContent+=' — Run make serve-native32-simulator and open http://localhost:8080/. For offline use, open build/native32-simulator.html made by make native32-demo.';}

@@ -7,7 +7,7 @@ public static class Server
 {
     /// <summary>Serve a directory on localhost, with the WebAssembly MIME type.</summary>
     /// <remarks>This hosts static bytes only. All BASIC execution happens in the browser.</remarks>
-    public static void Run(string directory, int port)
+    public static void Run(string directory, int port, string defaultPage = "index.html")
     {
         string root = Path.GetFullPath(directory) + Path.DirectorySeparatorChar;
         using var listener = new HttpListener();
@@ -23,7 +23,7 @@ public static class Server
             try
             {
                 string requested = Uri.UnescapeDataString(context.Request.Url!.AbsolutePath).TrimStart('/');
-                string path = Path.GetFullPath(Path.Combine(root, requested.Length == 0 ? "index.html" : requested));
+                string path = Path.GetFullPath(Path.Combine(root, requested.Length == 0 ? defaultPage : requested));
                 if (!path.StartsWith(root, StringComparison.Ordinal) || !File.Exists(path)) { context.Response.StatusCode = 404; continue; }
                 context.Response.ContentType = Path.GetExtension(path) switch
                 { ".html" => "text/html; charset=utf-8", ".mjs" or ".js" => "text/javascript; charset=utf-8", ".css" => "text/css; charset=utf-8", ".wasm" => "application/wasm", _ => "application/octet-stream" };

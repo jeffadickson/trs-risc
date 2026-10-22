@@ -231,7 +231,7 @@ docs-native32: native32-size ensure-docs
 
 .PHONY: serve-native32
 serve-native32: native32-wasm tools
-	$(TOOLS) serve web 8080
+	$(TOOLS) serve web 8080 native32.html
 
 # The Z80 reference is test-only; it never enters the native firmware.
 .PHONY: test-native32-math test-native32-math-rom
@@ -294,9 +294,10 @@ native32-simulator: native32-rom
 	$(MAKE) web/rv32-board.wasm web/native32-rom.elf web/native32-rom-compact.elf
 test-native32-simulator: native32-simulator
 	node tests/native32/simulator.mjs
+	node tests/native32/demo-ui.mjs
 
 .PHONY: native32-demo serve-native32-simulator
 native32-demo: native32-simulator tools
 	$(TOOLS) browser-bundle build/native32-simulator.html
 serve-native32-simulator: native32-simulator tools
-	$(TOOLS) serve web 8080
+	$(TOOLS) serve web 8080 rv32-demo.html
