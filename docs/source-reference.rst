@@ -76,6 +76,8 @@ Run ``dotnet build/tools/TrsRisc.Tools.dll COMMAND ...`` (the Makefile handles t
    basic-smoke COMMAND [ARGS...] token image / errors / corruption tests
    size-report ROM ELF OUTPUT    ELF section/symbol measurements as Sphinx text
    serve DIRECTORY PORT          localhost static HTML/WASM server
+   annotate-rv32 INPUT OUTPUT    RV32 math listing with Z80 function headers
+   test-annotate-rv32 INPUT      negative, randomized and mutation listing checks
 
 These tools use .NET framework libraries only. No Python project utilities or
 NuGet packages are needed. Python remains solely for the external Sphinx package

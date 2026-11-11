@@ -32,6 +32,11 @@ kernel is instantiated for float and double, so SINGLE arithmetic rounds at
 float operation boundaries. Fused multiply-add contraction is disabled.
 There are no host libm calls in the production core.
 
+For compiler-emitted RV32 instructions with Z80 excerpts in every function
+header, nearby C source and instruction comments, see :doc:`native32-math-assembly`.
+The `assembly listing <https://github.com/jeffadickson/trs-risc/blob/native-rv32-rebuild/docs/listings/native32-math-rv32.s>`_ can also be read directly
+on GitHub.
+
 LOG decoding
 ------------
 

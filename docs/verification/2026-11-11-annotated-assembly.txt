@@ -1,0 +1,104 @@
+Annotated RV32 math assembly: publication verification, 2026-11-11
+================================================================
+
+Base revision: 09a12e36bc51ad7074c8ecfe69d6e7a4d4a5f3d5.
+Scope: previously prepared .NET 10/WSL prerequisites, annotated assembly,
+reproduction tooling, tests, requirements and documentation. No production
+C interpreter source changes. This report records fresh execution; the
+October 24 results are historical evidence only.
+
+Environment and artifacts
+-------------------------
+Windows SDK selected by global.json: .NET 10.0.403 (10.0.402 baseline,
+latestFeature roll-forward). Coverlet.Console 10.1.0. Ubuntu-24.04 WSL:
+Zig 0.14.1, Sphinx 8.2.3, StrictDoc 0.30.4.
+New Windows build/intermediate/coverage output is under the run-specific
+CODEX_ARTIFACT_ROOT/trs-risc/native-rv32-rebuild/publish/20261111-071801
+(E:/Artifacts on this machine); Linux source snapshot/output is under
+$HOME/.cache/trs-risc-publish/20261111-071801 on the native WSL filesystem.
+The run uses one .NET build worker and serial test/coverage execution.
+Managed .NET output was built; Native AOT was not attempted.
+
+Commands and observed results
+-----------------------------
+Run from the checked repository root unless otherwise noted. REPO is the
+verified checkout, RUN the Windows artifact directory, NATIVE the isolated
+WSL source snapshot, ZIG the existing Zig 0.14.1 executable, and TOOL the
+freshly built RUN/tools/TrsRisc.Tools.dll. Check these directories with
+Test-Path -LiteralPath $path -PathType Container before using/changing them.
+
+1. dotnet build tools/TrsRisc.Tools -c Release -o RUN/tools
+   -p:BaseIntermediateOutputPath=RUN/obj/ --disable-build-servers -m:1 --nologo
+   PASS: 0 warnings, 0 errors; output and intermediates were on E:.
+2. In NATIVE, ZIG cc -target riscv32-freestanding
+   -mcpu=generic_rv32+m+a-c-d-f -mabi=ilp32 -std=c11 -Wall -Wextra -Werror
+   -Wno-misleading-indentation -ffp-contract=off -Oz -ffreestanding
+   -fno-builtin -fno-inline -Isrc/native32/board/include -Isrc/native32
+   -S -gline-tables-only -fverbose-asm src/native32/math.c
+   -o build/native32-math.s
+   PASS: fresh raw study assembly; not an address listing of linked/LTO ROM.
+3. dotnet TOOL test-annotate-rv32 RUN/native32-math.s
+   PASS: 526 checks, seed 20261024. Includes malformed/negative cases,
+   valid LF/CRLF randomized streams, 256 immediate-change mutants, and
+   removed function/header/ancestry mutants. No failing counterexamples.
+   Bounded structural fuzz/property tests; not a general assembler fuzzer
+   or a whole-application mutation score. Stryker.NET was not run.
+4. dotnet TOOL annotate-rv32 RUN/native32-math.s RUN/native32-math-rv32.s
+   PASS: regenerated file equals the pending listing byte for byte.
+   SHA256: 7190325E0993714E0C05E33065B89645A0D94BA27F48AEF85753F1D66B59D3EB.
+   The listing has 19 function headers, 134 C-source annotations and
+   1,220 instruction annotations. Headers contain documented Z80 excerpts
+   or callers; native IEEE-only helpers are explicitly distinguished.
+5. In NATIVE, reassemble raw and commented files with:
+   ZIG cc -target riscv32-freestanding -mcpu=generic_rv32+m+a-c-d-f
+   -mabi=ilp32 -c INPUT.s -o OUTPUT.o
+   Use objdump -h to enumerate .text/.rodata sections, and objcopy
+   -I elf32-little --dump-section=SECTION=OUTPUT.bin INPUT.o for each.
+   PASS: individual section SHA-256 hashes match:
+   .text   0E52BB24F2BFEE70B7546EFD1E194289926ECB6F4DE3C04439CD52C6E6332BCA
+   .rodata 88E2FB091BBFD21FFE51B3255ACA7A0F02EB443AA558E1FA714E559AF093E78A
+6. coverlet TOOL --target dotnet --targetargs
+   "TOOL test-annotate-rv32 RUN/native32-math.s" --include-test-assembly
+   --include "[TrsRisc.Tools]TrsRisc.Tools.AnnotatedAssembly*"
+   --exclude "[TrsRisc.Tools]TrsRisc.Tools.AnnotatedAssemblyTests*"
+   --format cobertura --output RUN/coverage.cobertura.xml
+   PASS: 526 checks; annotator coverage 106/108 lines (98.14%),
+   196/220 branches (89.09%), 100% methods. Excludes tests, CLI routing,
+   existing unrelated tools and all firmware code. Coverage is execution
+   evidence, not proof of correctness. Raw reports remain in RUN.
+7. In NATIVE, sphinx-build -n -W --keep-going -b html docs build/docs/html
+   PASS: full 17-document build, then incremental check after GitHub link
+   updates. Existing generated native size data was reused for rendering;
+   the historical RV64 size include retains its not-generated notice.
+   These documentation checks are not a fresh firmware size measurement.
+8. In NATIVE, strictdoc export docs/annotated-assembly.sdoc
+   docs/local-wsl.sdoc --no-parallelization --formats html
+   --output-dir build/requirements
+   PASS: both documents parsed and exported, six stable requirement IDs.
+   The real exporter found two RST comment-formatting issues (indentation
+   and an unescaped wildcard); both were corrected before the passing run.
+9. WSL sh -n tools/bootstrap.sh, plus a byte-level CR check.
+   PASS: shell syntax valid and LF line endings preserved.
+
+Traceability and limits
+-----------------------
+TRS-ASM-001: all function declarations and Z80 headers: checks 3/4.
+TRS-ASM-002: instruction preservation and comments: checks 3/4/5.
+TRS-ASM-003: deterministic generation and rejection paths: checks 2/3/4.
+TRS-WSL-001/003: bootstrap LF, .NET build baseline: checks 1/9 and source
+inspection of SDK/CI/bootstrap pins. TRS-WSL-002 simulator startup was not
+rerun for this publication; the earlier report remains historical evidence.
+No formal proof, full source-wide mutation campaign, new simulator startup,
+full historical ROM/Linux/WASM/browser regression suite, or GitHub CI result
+is claimed by this report. Existing CI triggers/policy remain unchanged;
+only the previously requested SDK version pin is updated.
+
+Tested source SHA-256 hashes (working-file bytes)
+------------------------------------------------
+tools/TrsRisc.Tools/AnnotatedAssembly.cs 2A862B2CDAD65C9D4FE8B9CF0C32CCB4A799A261DBE055C393C861BC318BAC3A
+tools/TrsRisc.Tools/AnnotatedAssemblyTests.cs F254D4285374BB5AB529E006CB2F3F910931923D9B31D51DAD4A81EB9CDA0EEB
+tools/TrsRisc.Tools/Program.cs D2E2607BF7C87C412015186B0B37A125E7C6BE33C77C64FAA129760F48CEF6BC
+src/native32/math.c 916BF51A85B327B017CFD8A00445D1DB36A5673626EDC3C43A42279AB46D7047
+src/native32/math_kernel.inc 35568E89E40CC08B58DA42D4920ECF0AB3B4352F3A2D66672A0474D41496A3D2
+src/native32/exp_double.inc 2583F7296E8E2B24442D0F93ED8DD968C7B04590C22AD2EDDF979D22A24886BA
+docs/listings/native32-math-rv32.s 7190325E0993714E0C05E33065B89645A0D94BA27F48AEF85753F1D66B59D3EB

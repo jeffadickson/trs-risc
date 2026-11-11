@@ -8,9 +8,11 @@ public static class Program
     {
         try
         {
-            if (args.Length == 0) throw new ArgumentException("commands: translate, fetch-rom, fixtures, demo, smoke, basic-smoke, size-report, serve");
+            if (args.Length == 0) throw new ArgumentException("commands: translate, fetch-rom, fixtures, demo, smoke, basic-smoke, size-report, serve, annotate-rv32, test-annotate-rv32");
             switch (args[0])
             {
+                case "annotate-rv32" when args.Length == 3: AnnotatedAssembly.Generate(args[1], args[2]); break;
+                case "test-annotate-rv32" when args.Length == 2: AnnotatedAssemblyTests.Run(args[1]); break;
                 case "browser-bundle" when args.Length == 2: BrowserBundle.Generate(args[1]); break;
                 case "exp-accuracy" when args.Length == 3: ExpAccuracy.Generate(args[1], args[2]); break;
                 case "translate" when args.Length == 3: Translator.TranslateFile(args[1], args[2]); break;

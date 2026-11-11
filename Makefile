@@ -301,3 +301,15 @@ native32-demo: native32-simulator tools
 	$(TOOLS) browser-bundle build/native32-simulator.html
 serve-native32-simulator: native32-simulator tools
 	$(TOOLS) serve web 8080 rv32-demo.html
+
+# Study assembly deliberately disables inlining so every math helper retains a
+# visible function boundary. It is separate from either linked firmware image.
+.PHONY: native32-math-listing test-native32-math-listing
+build/native32-math.s: src/native32/math.c $(N32_HEADERS)
+	mkdir -p build
+	$(N32_ROM_CC) -mcpu=generic_rv32+m+a-c-d-f -mabi=ilp32 $(N32_WARN) -Oz -ffreestanding -fno-builtin -fno-inline -Isrc/native32/board/include -Isrc/native32 -S -gline-tables-only -fverbose-asm $< -o $@
+native32-math-listing: ensure-zig tools
+	$(MAKE) build/native32-math.s
+	$(TOOLS) annotate-rv32 build/native32-math.s docs/listings/native32-math-rv32.s
+test-native32-math-listing: native32-math-listing
+	$(TOOLS) test-annotate-rv32 build/native32-math.s

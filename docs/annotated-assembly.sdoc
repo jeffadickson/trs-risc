@@ -1,0 +1,44 @@
+[DOCUMENT]
+TITLE: Annotated RV32 math assembly
+
+[REQUIREMENT]
+UID: TRS-ASM-001
+TITLE: Z80 ancestry for every math function
+STATEMENT: >>>
+The RV32 math study listing shall contain every emitted math function and a
+header with documented Z80 excerpts or call sites, ROM addresses and an
+explanation of native IEEE differences.
+<<<
+COMMENT: >>>
+Implementation: tools/TrsRisc.Tools/AnnotatedAssembly.cs and
+docs/listings/native32-math-rv32.s. Verification: test-annotate-rv32 validates
+function declarations and headers against the compiler output (19 functions).
+Evidence: docs/verification/2026-11-11-annotated-assembly.txt.
+<<<
+
+[REQUIREMENT]
+UID: TRS-ASM-002
+TITLE: Explain and preserve RV32 code
+STATEMENT: >>>
+The listing shall retain the compiler instruction stream and data, annotate
+every RV32 instruction, include corresponding C source lines, and identify
+its soft-float ABI and non-inlined study build configuration.
+<<<
+COMMENT: >>>
+Implementation: AnnotatedAssembly.Render/Validate; Makefile native32-math-listing.
+Verification: structural tests, negative cases, seeded randomized streams and
+mutations; independent reassembly text/rodata payload comparison.
+<<<
+
+[REQUIREMENT]
+UID: TRS-ASM-003
+TITLE: Reproducible generation
+STATEMENT: >>>
+A documented Make target shall regenerate the annotated listing from current
+C sources with Zig 0.14.1 and .NET 10 tools; unknown functions or opcodes shall
+fail generation instead of silently omitting annotations.
+<<<
+COMMENT: >>>
+Implementation: Makefile native32-math-listing/test-native32-math-listing and
+docs/native32-math-assembly.rst. Verification: generation and rejection tests.
+<<<
