@@ -1,0 +1,37 @@
+[DOCUMENT]
+TITLE: Local WSL simulator startup
+
+[REQUIREMENT]
+UID: TRS-WSL-001
+TITLE: POSIX bootstrap line endings
+STATEMENT: >>>
+tools/bootstrap.sh shall use LF line endings and pass sh -n in WSL.
+<<<
+COMMENT: >>>
+Implementation: tools/bootstrap.sh and .gitattributes (``*.sh text eol=lf``).
+Verification: PowerShell byte inspection and WSL sh -n tools/bootstrap.sh.
+<<<
+
+[REQUIREMENT]
+UID: TRS-WSL-002
+TITLE: RV32 simulator service
+STATEMENT: >>>
+The native-rv32-rebuild simulator shall build in WSL and serve rv32-demo.html
+and its WASM and ROM assets on loopback port 8081.
+<<<
+COMMENT: >>>
+Implementation: Makefile native32-simulator and TrsRisc.Tools serve command.
+Verification: make test-native32 test-native32-simulator and HTTP asset checks.
+<<<
+
+[REQUIREMENT]
+UID: TRS-WSL-003
+TITLE: .NET 10 tooling baseline
+STATEMENT: >>>
+C# build tools and CI shall target .NET 10 or later. The bootstrap fallback
+shall pin a .NET 10 SDK and verify its archive using the release manifest.
+<<<
+COMMENT: >>>
+Implementation: global.json, tools/TrsRisc.Tools/TrsRisc.Tools.csproj, tools/bootstrap.sh,
+.github/workflows/ci.yml. Verification: WSL make tools with .NET 10.0.402.
+<<<

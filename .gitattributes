@@ -1,0 +1,2 @@
+# Shell entry points must remain executable by POSIX shells after checkout.
+*.sh text eol=lf

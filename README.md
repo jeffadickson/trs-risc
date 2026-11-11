@@ -54,7 +54,7 @@ output or multiple objects. RV64I, M, and single-hart A are implemented; C/F/D, 
 an MMU, threads, dynamic linking and general Linux compatibility are not.
 
 ```sh
-make bootstrap              # local .NET 8 SDK + Sphinx
+make bootstrap              # local .NET 10 SDK + Sphinx
 make host                   # C# tools, pinned/verified ROM, translated C, binaries
 make demo                   # Demo.cs supplies source; the ROM computes the output
 make test

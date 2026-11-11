@@ -5,7 +5,7 @@ Host prerequisites
 ------------------
 
 Use Linux x86-64 with a C compiler, Make, curl, tar, jq, sha512sum and Python 3
-with venv support, plus GNU or LLVM objcopy (binutils). The C# utilities target **.NET 8** and use only framework
+with venv support, plus GNU or LLVM objcopy (binutils). The C# utilities target **.NET 10** and use only framework
 libraries: there are no NuGet package dependencies. Sphinx is the sole use of
 Python in the project; ``docs/conf.py`` is its configuration, not a build tool.
 
@@ -24,7 +24,7 @@ Nothing is installed into system directories. ``.toolchain`` is ignored by Git.
 Microsoft's release manifest provides the SDK archive's checked SHA-512 digest.
 
 An existing ``dotnet`` on PATH is used in preference to downloading the SDK.
-The pinned fallback is SDK 8.0.413. The bootstrap script currently supports
+The pinned fallback is SDK 10.0.402. The bootstrap script currently supports
 Linux x86-64; on other systems, install suitable dependencies and override the
 Make variables. The generated C requires a little-endian target.
 
@@ -140,10 +140,10 @@ browser executable is not a replacement for the Linux browser used by the
 current test harness. Set ``CHROMIUM`` to its Linux executable path. No npm
 packages are required. Browser shared libraries must also be available.
 
-An existing ``dotnet`` command does not guarantee that the required .NET 8 SDK
+An existing ``dotnet`` command does not guarantee that the required .NET 10 SDK
 and runtime are installed. Check ``dotnet --list-sdks`` and
-``dotnet --list-runtimes``; .NET 10 alone was insufficient. The current bootstrap
-checks command presence, so provide .NET 8 explicitly in this case. A Linux SDK
+``dotnet --list-runtimes``. The current bootstrap
+checks command presence, so provide .NET 10 explicitly in this case. A Linux SDK
 installed in ``.toolchain/dotnet`` is automatically selected by Make. If using
 checkout-local Node, add ``.toolchain/node/bin`` to PATH before tests.
 

@@ -8,10 +8,10 @@ mode=${1:-all}
 mkdir -p "$root/.toolchain"
 if [ "$mode" = dotnet ] || [ "$mode" = all ]; then
     if ! command -v dotnet >/dev/null 2>&1 && [ ! -x "$root/.toolchain/dotnet/dotnet" ]; then
-        case "$(uname -s):$(uname -m)" in Linux:x86_64) ;; *) echo 'Install a .NET 8 SDK for your platform and put dotnet on PATH.' >&2; exit 1;; esac
+        case "$(uname -s):$(uname -m)" in Linux:x86_64) ;; *) echo 'Install a .NET 10 SDK for your platform and put dotnet on PATH.' >&2; exit 1;; esac
         # Use Microsoft's release manifest to verify the SDK archive's SHA-512.
-        version=8.0.413
-        curl --fail --location --retry 2 'https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json' -o "$root/.toolchain/dotnet-releases.json"
+        version=10.0.402
+        curl --fail --location --retry 2 'https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json' -o "$root/.toolchain/dotnet-releases.json"
         archive_url=$(jq -r --arg ver "$version" '[.releases[].sdks[]? | select(.version==$ver) | .files[] | select(.rid=="linux-x64" and (.name|endswith(".tar.gz")))][0].url' "$root/.toolchain/dotnet-releases.json")
         archive_hash=$(jq -r --arg ver "$version" '[.releases[].sdks[]? | select(.version==$ver) | .files[] | select(.rid=="linux-x64" and (.name|endswith(".tar.gz")))][0].hash' "$root/.toolchain/dotnet-releases.json")
         [ "$archive_url" != null ] && [ "$archive_hash" != null ]
